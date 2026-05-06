@@ -138,9 +138,8 @@ async function analyzeImage(imageBase64, mode, source) {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        image_base64: imageBase64,
-        mode,
-        source
+        image: imageBase64.includes(",") ? imageBase64.split(",")[1] : imageBase64,
+        mode: mode
       })
     });
 
@@ -156,7 +155,7 @@ async function analyzeImage(imageBase64, mode, source) {
       "The backend returned a response, but no description was found."
     );
   } catch (error) {
-    return mockVisionResponse(mode, source);
+    return "Could not connect to backend. Make sure FastAPI is running on http://localhost:8000.";
   }
 }
 

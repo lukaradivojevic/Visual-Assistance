@@ -1,4 +1,15 @@
+import os
+from openai import OpenAI
+from dotenv import load_dotenv
+
+load_dotenv()
+
 VALID_MODES = ["general", "short", "text", "obstacles"]
+
+client = OpenAI(
+    api_key=os.getenv("MISTRAL_API_KEY"),
+    base_url="https://api.mistral.ai/v1"
+)
 
 
 def build_prompt(mode: str) -> str:
@@ -28,10 +39,28 @@ def build_prompt(mode: str) -> str:
 
 
 def analyze_image(image_base64: str, mode: str = "general") -> str:
-    if mode not in VALID_MODES:
-        mode = "general"
-
     prompt = build_prompt(mode)
 
-    # Temporary fake response until we connect the real AI vision model.
-    return f"FAKE AI RESPONSE [{mode}]: {prompt}"
+    response = client.chat.completions.create(
+        model="pixtral-12b-2409",
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": prompt
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{image_base64}"
+                        }
+                    }
+                ]
+            }
+        ],
+        max_tokens=250
+    )
+
+    return response.choices[0].message.content
