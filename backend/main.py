@@ -59,7 +59,21 @@ def analyze_camera(request: CameraRequest):
             "error": error_message
         }
 
-    description = analyze_image(request.image, request.mode)
+    try:
+        description = analyze_image(request.image, request.mode)
+    except Exception as e:
+        error_message = f"AI analysis failed: {str(e)}"
+        log_request(
+            mode=request.mode,
+            success=False,
+            error=error_message
+        )
+
+        return {
+            "success": False,
+            "description": "",
+            "error": error_message
+        }
 
     log_request(
         mode=request.mode,

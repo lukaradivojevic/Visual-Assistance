@@ -231,5 +231,3 @@ venv/
 # Logs
 logs.jsonl
 *.log
-
-something.txt
