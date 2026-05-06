@@ -1,0 +1,31 @@
+backend/
+├── main.py          # FastAPI server and endpoints
+├── vision_agent.py  # AI logic: prompts and image analysis
+├── logger.py        # logging requests and responses
+├── requirements.txt # required libraries
+
+tok izgleda ovako:
+1. Klikneš Capture & Describe
+2. Frontend uhvati frame iz kamere preko canvas-a
+3. Canvas napravi base64 sliku
+4. Frontend pošalje backendu:
+   {
+     "image": "čist_base64",
+     "mode": "short"
+   }
+
+5. Backend primi request u /analyze-camera
+6. Backend pozove:
+   analyze_image(request.image, request.mode)
+
+7. vision_agent.py napravi prompt za Short/General/Text/Obstacles
+8. Pošalje prompt + sliku Mistral Pixtral modelu
+9. Mistral vrati opis
+10. Backend vrati JSON frontendu:
+   {
+     "success": true,
+     "description": "...opis slike...",
+     "mode": "short"
+   }
+
+11. Frontend prikaže description i pročita ga naglas
