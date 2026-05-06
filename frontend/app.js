@@ -132,29 +132,34 @@ function captureFrame(videoElement, canvasElement) {
 
 async function analyzeImage(imageBase64, mode, source) {
   try {
+    const cleanBase64 = imageBase64.includes(",")
+      ? imageBase64.split(",")[1]
+      : imageBase64;
+
     const response = await fetch(`${API_BASE_URL}/analyze-camera`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        image: imageBase64.includes(",") ? imageBase64.split(",")[1] : imageBase64,
+        image: cleanBase64,
         mode: mode
       })
     });
 
-    if (!response.ok) {
-      throw new Error("Backend error");
-    }
-
     const data = await response.json();
 
-    return (
-      data.description ||
-      data.response ||
-      "The backend returned a response, but no description was found."
-    );
+    if (!response.ok) {
+      return data.error || "Backend error.";
+    }
+
+    if (!data.success) {
+      return data.error || "AI analysis failed.";
+    }
+
+    return data.description || "No description returned from backend.";
   } catch (error) {
+    console.error("Frontend-backend connection error:", error);
     return "Could not connect to backend. Make sure FastAPI is running on http://localhost:8000.";
   }
 }
