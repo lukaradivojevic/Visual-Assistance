@@ -10,7 +10,7 @@
   For phone camera, HTTPS is strongly recommended.
 */
 
-const API_BASE_URL = "http://visual-assistance-load-balancer-1429357949.eu-west-1.elb.amazonaws.com/api/";
+const API_BASE_URL = "http://visual-assistance-load-balancer-1429357949.eu-west-1.elb.amazonaws.com";
 
 let realtimeStream = null;
 let captureStream = null;
@@ -134,34 +134,48 @@ function captureFrame(videoElement, canvasElement) {
   return canvasElement.toDataURL("image/jpeg", 0.8);
 }
 
+function removeDataUrlPrefix(imageBase64) {
+  if (!imageBase64) return "";
+
+  if (imageBase64.includes(",")) {
+    return imageBase64.split(",")[1];
+  }
+
+  return imageBase64;
+}
+
 async function analyzeImage(imageBase64, mode, source) {
   try {
+    console.log("Sending request to:", `${API_BASE_URL}/analyze-camera`);
+
     const response = await fetch(`${API_BASE_URL}/analyze-camera`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        image_base64: imageBase64,
-        mode: mode,
-        source: source
+        image: removeDataUrlPrefix(imageBase64),
+        mode: mode
       })
     });
 
-    if (!response.ok) {
-      throw new Error("Backend error");
-    }
+    console.log("Backend status:", response.status);
 
     const data = await response.json();
+    console.log("Backend response:", data);
 
-    return (
-      data.description ||
-      data.response ||
-      "The backend returned a response, but no description was found."
-    );
+    if (!response.ok) {
+      return "Backend HTTP error: " + response.status;
+    }
+
+    if (data.success === false) {
+      return data.error || "Backend returned success false.";
+    }
+
+    return data.description || "Backend returned no description.";
   } catch (error) {
-    console.error(error);
-    return mockVisionResponse(mode, source);
+    console.error("FETCH ERROR:", error);
+    return "ERROR: Could not connect to backend. Check Console and backend URL.";
   }
 }
 

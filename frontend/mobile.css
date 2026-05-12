@@ -384,19 +384,21 @@ td {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 82px;
+  min-height: 96px;
   background: rgba(255, 255, 255, 0.96);
   border-top: 1px solid rgba(191, 219, 254, 0.9);
   display: flex;
-  gap: 6px;
+  gap: 8px;
   overflow-x: auto;
-  padding: 8px 8px 10px;
+  overflow-y: hidden;
+  padding: 10px 8px 18px;
   z-index: 30;
   box-shadow: 0 -12px 30px rgba(15, 23, 42, 0.08);
 }
 
 .nav-btn {
-  min-width: 78px;
+  min-width: 88px;
+  height: 70px;
   border: none;
   background: var(--blue-50);
   color: var(--blue-800);
@@ -405,6 +407,12 @@ td {
   font-size: 12px;
   font-weight: 800;
   cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 .nav-btn span {
@@ -420,10 +428,8 @@ td {
 
 @media (min-width: 700px) {
   .mobile-app {
-    max-width: 520px;
-    margin: 0 auto;
-    border-left: 1px solid #bfdbfe;
-    border-right: 1px solid #bfdbfe;
+    min-height: 100vh;
+    padding-bottom: 115px;
   }
 
   .bottom-nav {
