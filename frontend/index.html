@@ -8,6 +8,8 @@
 </head>
 <body>
   <div class="app">
+
+    <!-- ── DESKTOP SIDEBAR ───────────────────────────────────────── -->
     <aside class="sidebar">
       <div class="brand">
         <div class="logo">VA</div>
@@ -18,13 +20,13 @@
       </div>
 
       <nav class="menu">
-        <button class="menu-btn active" data-page="realtime">Realtime Assistance</button>
-        <button class="menu-btn" data-page="capture">Capture Photo</button>
-        <button class="menu-btn" data-page="upload">Upload Image</button>
-        <button class="menu-btn" data-page="medical">Medical Assistant</button>
-        <button class="menu-btn" data-page="drug">Drug Interaction</button>
-        <button class="menu-btn" data-page="document">Document Explainer</button>
-        <button class="menu-btn" data-page="reminder">Medicine Reminder</button>
+        <button class="menu-btn active" data-page="realtime" data-title="Realtime Assistance">Realtime Assistance</button>
+        <button class="menu-btn" data-page="capture"  data-title="Capture Photo">Capture Photo</button>
+        <button class="menu-btn" data-page="upload"   data-title="Upload Image">Upload Image</button>
+        <button class="menu-btn" data-page="medical"  data-title="Medical Assistant">Medical Assistant</button>
+        <button class="menu-btn" data-page="drug"     data-title="Drug Interaction">Drug Interaction</button>
+        <button class="menu-btn" data-page="document" data-title="Document Explainer">Document Explainer</button>
+        <button class="menu-btn" data-page="reminder" data-title="Medicine Reminder">Medicine Reminder</button>
       </nav>
 
       <div class="sidebar-footer">
@@ -33,425 +35,483 @@
       </div>
     </aside>
 
-    <main class="main">
-      <!-- REALTIME -->
-      <section class="page active" id="realtime">
-        <div class="page-header">
-          <div>
-            <span class="tag">Current tab</span>
-            <h2>Realtime Assistance</h2>
-            <p>Camera stays active and the assistant periodically describes what is in front of the user.</p>
-          </div>
-          <div class="status-card" id="realtimeStatus">Ready</div>
+    <!-- ── PAGE AREA (wraps mobile header + content + mobile nav) ── -->
+    <div class="page-area">
+
+      <!-- Mobile-only sticky top header -->
+      <header class="top-header">
+        <div>
+          <span class="small-label">Visual Assistance</span>
+          <h1 id="pageTitle">Realtime Assistance</h1>
         </div>
+        <div class="status-pill" id="globalStatus">Ready</div>
+      </header>
 
-        <div class="grid two">
-          <div class="panel camera-panel">
-            <div class="panel-title">
-              <h3>Camera Preview</h3>
-              <span>Live camera feed</span>
+      <!-- ── MAIN CONTENT ──────────────────────────────────────── -->
+      <main class="main">
+
+        <!-- REALTIME -->
+        <section class="page active" id="realtime">
+          <div class="page-header">
+            <div>
+              <span class="tag">Current tab</span>
+              <h2>Realtime Assistance</h2>
+              <p>Camera stays active and the assistant periodically describes what is in front of the user.</p>
             </div>
+            <div class="status-card" id="realtimeStatus">Ready</div>
+          </div>
 
-            <div class="camera-preview">
-              <video id="realtimeVideo" autoplay playsinline></video>
-              <canvas id="realtimeCanvas" hidden></canvas>
-              <div class="camera-placeholder" id="realtimePlaceholder">
-                Camera preview will appear here
+          <div class="grid two">
+            <div class="panel camera-panel">
+              <div class="panel-title">
+                <h3>Camera Preview</h3>
+                <span>Live camera feed</span>
+              </div>
+              <div class="camera-preview">
+                <video id="realtimeVideo" autoplay playsinline></video>
+                <canvas id="realtimeCanvas" hidden></canvas>
+                <div class="camera-placeholder" id="realtimePlaceholder">
+                  <div class="placeholder-icon">📷</div>
+                  Camera preview will appear here
+                </div>
+              </div>
+              <div class="controls">
+                <button class="btn primary" id="startRealtimeBtn">Start Realtime</button>
+                <button class="btn danger"  id="stopRealtimeBtn">Stop</button>
               </div>
             </div>
 
-            <div class="controls">
-              <button class="btn primary" id="startRealtimeBtn">Start Realtime</button>
-              <button class="btn danger" id="stopRealtimeBtn">Stop</button>
+            <div class="panel">
+              <div class="panel-title">
+                <h3>Realtime Controls</h3>
+                <span>Speech and analysis settings</span>
+              </div>
+
+              <label class="field">
+                Assistance mode
+                <select id="realtimeMode">
+                  <option value="general">General scene description</option>
+                  <option value="short">Short description</option>
+                  <option value="text">Read visible text</option>
+                  <option value="obstacles">Obstacle detection</option>
+                </select>
+              </label>
+
+              <label class="field">
+                Analysis interval
+                <select id="realtimeInterval">
+                  <option value="3000">Every 3 seconds</option>
+                  <option value="5000">Every 5 seconds</option>
+                  <option value="8000">Every 8 seconds</option>
+                </select>
+              </label>
+
+              <div class="response-box">
+                <h3>Last spoken description</h3>
+                <p id="realtimeResponse">No realtime description yet.</p>
+              </div>
+
+              <div class="controls">
+                <button class="btn secondary" id="repeatRealtimeBtn">Repeat</button>
+                <button class="btn secondary" id="stopVoiceRealtimeBtn">Stop Voice</button>
+              </div>
             </div>
           </div>
+        </section>
 
-          <div class="panel">
-            <div class="panel-title">
-              <h3>Realtime Controls</h3>
-              <span>Speech and analysis settings</span>
+        <!-- CAPTURE -->
+        <section class="page" id="capture">
+          <div class="page-header">
+            <div>
+              <span class="tag">Current tab</span>
+              <h2>Capture Photo</h2>
+              <p>Take one camera frame and get a detailed AI description.</p>
             </div>
-
-            <label class="field">
-              Assistance mode
-              <select id="realtimeMode">
-                <option value="general">General scene description</option>
-                <option value="short">Short description</option>
-                <option value="text">Read visible text</option>
-                <option value="obstacles">Obstacle detection</option>
-              </select>
-            </label>
-
-            <label class="field">
-              Analysis interval
-              <select id="realtimeInterval">
-                <option value="3000">Every 3 seconds</option>
-                <option value="5000">Every 5 seconds</option>
-                <option value="8000">Every 8 seconds</option>
-              </select>
-            </label>
-
-            <div class="response-box">
-              <h3>Last spoken description</h3>
-              <p id="realtimeResponse">No realtime description yet.</p>
-            </div>
-
-            <div class="controls">
-              <button class="btn secondary" id="repeatRealtimeBtn">Repeat</button>
-              <button class="btn secondary" id="stopVoiceRealtimeBtn">Stop Voice</button>
-            </div>
+            <div class="status-card" id="captureStatus">Ready</div>
           </div>
-        </div>
-      </section>
 
-      <!-- CAPTURE -->
-      <section class="page" id="capture">
-        <div class="page-header">
-          <div>
-            <span class="tag">Current tab</span>
-            <h2>Capture Photo</h2>
-            <p>Take one camera frame and get a detailed AI description.</p>
-          </div>
-          <div class="status-card" id="captureStatus">Ready</div>
-        </div>
-
-        <div class="grid two">
-          <div class="panel camera-panel">
-            <div class="panel-title">
-              <h3>Camera Preview</h3>
-              <span>Single image capture</span>
-            </div>
-
-            <div class="camera-preview">
-              <video id="captureVideo" autoplay playsinline></video>
-              <canvas id="captureCanvas" hidden></canvas>
-              <div class="camera-placeholder" id="capturePlaceholder">
-                Camera preview will appear here
+          <div class="grid two">
+            <div class="panel camera-panel">
+              <div class="panel-title">
+                <h3>Camera Preview</h3>
+                <span>Single image capture</span>
+              </div>
+              <div class="camera-preview">
+                <video id="captureVideo" autoplay playsinline></video>
+                <canvas id="captureCanvas" hidden></canvas>
+                <div class="camera-placeholder" id="capturePlaceholder">
+                  <div class="placeholder-icon">📸</div>
+                  Camera preview will appear here
+                </div>
+              </div>
+              <div class="controls">
+                <button class="btn primary" id="startCaptureCameraBtn">Start Camera</button>
+                <button class="btn accent"  id="capturePhotoBtn">Capture &amp; Describe</button>
               </div>
             </div>
 
-            <div class="controls">
-              <button class="btn primary" id="startCaptureCameraBtn">Start Camera</button>
-              <button class="btn accent" id="capturePhotoBtn">Capture & Describe</button>
+            <div class="panel">
+              <div class="panel-title">
+                <h3>Capture Result</h3>
+                <span>Detailed image explanation</span>
+              </div>
+
+              <label class="field">
+                Description mode
+                <select id="captureMode">
+                  <option value="general">General</option>
+                  <option value="short">Short</option>
+                  <option value="text">Text reading</option>
+                  <option value="obstacles">Obstacles</option>
+                </select>
+              </label>
+
+              <div class="response-box large">
+                <h3>Description</h3>
+                <p id="captureResponse">No photo captured yet.</p>
+              </div>
+
+              <div class="controls">
+                <button class="btn secondary" id="repeatCaptureBtn">Repeat</button>
+                <button class="btn secondary" id="stopVoiceCaptureBtn">Stop Voice</button>
+              </div>
             </div>
           </div>
+        </section>
 
-          <div class="panel">
-            <div class="panel-title">
-              <h3>Capture Result</h3>
-              <span>Detailed image explanation</span>
+        <!-- UPLOAD -->
+        <section class="page" id="upload">
+          <div class="page-header">
+            <div>
+              <span class="tag">Current tab</span>
+              <h2>Upload Image</h2>
+              <p>Upload an existing image and let the assistant explain it.</p>
             </div>
-
-            <label class="field">
-              Description mode
-              <select id="captureMode">
-                <option value="general">General</option>
-                <option value="short">Short</option>
-                <option value="text">Text reading</option>
-                <option value="obstacles">Obstacles</option>
-              </select>
-            </label>
-
-            <div class="response-box large">
-              <h3>Description</h3>
-              <p id="captureResponse">No photo captured yet.</p>
-            </div>
-
-            <div class="controls">
-              <button class="btn secondary" id="repeatCaptureBtn">Repeat</button>
-              <button class="btn secondary" id="stopVoiceCaptureBtn">Stop Voice</button>
-            </div>
+            <div class="status-card" id="uploadStatus">Ready</div>
           </div>
-        </div>
-      </section>
 
-      <!-- UPLOAD -->
-      <section class="page" id="upload">
-        <div class="page-header">
-          <div>
-            <span class="tag">Current tab</span>
-            <h2>Upload Image</h2>
-            <p>Upload an existing image and let the assistant explain it.</p>
-          </div>
-          <div class="status-card" id="uploadStatus">Ready</div>
-        </div>
+          <div class="grid two">
+            <div class="panel">
+              <div class="panel-title">
+                <h3>Image Upload</h3>
+                <span>Choose a photo to analyze</span>
+              </div>
 
-        <div class="grid two">
-          <div class="panel">
-            <div class="panel-title">
-              <h3>Image Preview</h3>
-              <span>Uploaded image</span>
-            </div>
+              <label class="upload-box" for="uploadInput">
+                <input type="file" id="uploadInput" accept="image/*" hidden />
+                <img id="uploadPreview" alt="Uploaded image preview" />
+                <div class="upload-placeholder" id="uploadPlaceholder">
+                  <div class="plus-icon">+</div>
+                  <strong>Choose image</strong>
+                  <p>Click or tap to select a photo</p>
+                </div>
+              </label>
 
-            <div class="upload-preview">
-              <img id="uploadPreview" alt="Uploaded image preview" />
-              <div class="camera-placeholder" id="uploadPlaceholder">
-                Uploaded image will appear here
+              <label class="field">
+                Analysis mode
+                <select id="uploadMode">
+                  <option value="general">General</option>
+                  <option value="short">Short</option>
+                  <option value="text">Text reading</option>
+                  <option value="obstacles">Obstacles</option>
+                </select>
+              </label>
+
+              <div class="controls">
+                <button class="btn primary" id="analyzeUploadBtn">Analyze Uploaded Image</button>
               </div>
             </div>
 
-            <div class="controls vertical">
-              <input type="file" id="uploadInput" accept="image/*" />
-              <button class="btn primary" id="analyzeUploadBtn">Analyze Uploaded Image</button>
+            <div class="panel">
+              <div class="panel-title">
+                <h3>Upload Result</h3>
+                <span>AI image interpretation</span>
+              </div>
+
+              <div class="response-box large">
+                <h3>Interpretation</h3>
+                <p id="uploadResponse">No image uploaded yet.</p>
+              </div>
+
+              <div class="controls">
+                <button class="btn secondary" id="repeatUploadBtn">Repeat</button>
+                <button class="btn secondary" id="stopVoiceUploadBtn">Stop Voice</button>
+              </div>
             </div>
           </div>
+        </section>
 
-          <div class="panel">
-            <div class="panel-title">
-              <h3>Upload Result</h3>
-              <span>AI image interpretation</span>
+        <!-- MEDICAL -->
+        <section class="page" id="medical">
+          <div class="page-header">
+            <div>
+              <span class="tag">Current tab</span>
+              <h2>Medical Assistant</h2>
+              <p>Use the camera to scan medicine packaging and get a simple explanation.</p>
             </div>
-
-            <label class="field">
-              Analysis mode
-              <select id="uploadMode">
-                <option value="general">General</option>
-                <option value="short">Short</option>
-                <option value="text">Text reading</option>
-                <option value="obstacles">Obstacles</option>
-              </select>
-            </label>
-
-            <div class="response-box large">
-              <h3>Interpretation</h3>
-              <p id="uploadResponse">No image uploaded yet.</p>
-            </div>
-
-            <div class="controls">
-              <button class="btn secondary" id="repeatUploadBtn">Repeat</button>
-              <button class="btn secondary" id="stopVoiceUploadBtn">Stop Voice</button>
-            </div>
+            <div class="status-card" id="medicalStatus">Ready</div>
           </div>
-        </div>
-      </section>
 
-      <!-- MEDICAL -->
-      <section class="page" id="medical">
-        <div class="page-header">
-          <div>
-            <span class="tag">Current tab</span>
-            <h2>Medical Assistant</h2>
-            <p>Use the camera to scan medicine packaging and get a simple explanation.</p>
+          <div class="medical-warning">
+            This is only an AI helper. Medicine identification and advice must be verified by a doctor or pharmacist.
           </div>
-          <div class="status-card" id="medicalStatus">Ready</div>
-        </div>
 
-        <div class="medical-warning">
-          This is only an AI helper. Medicine identification and advice must be verified by a doctor or pharmacist.
-        </div>
-
-        <div class="grid two">
-          <div class="panel camera-panel">
-            <div class="panel-title">
-              <h3>Medicine Camera Preview</h3>
-              <span>Point camera at medicine box or label</span>
-            </div>
-
-            <div class="camera-preview">
-              <video id="medicalVideo" autoplay playsinline></video>
-              <canvas id="medicalCanvas" hidden></canvas>
-              <div class="camera-placeholder" id="medicalPlaceholder">
-                Medicine camera preview will appear here
+          <div class="grid two">
+            <div class="panel camera-panel">
+              <div class="panel-title">
+                <h3>Medicine Camera</h3>
+                <span>Point camera at medicine box or label</span>
+              </div>
+              <div class="camera-preview">
+                <video id="medicalVideo" autoplay playsinline></video>
+                <canvas id="medicalCanvas" hidden></canvas>
+                <div class="camera-placeholder" id="medicalPlaceholder">
+                  <div class="placeholder-icon">💊</div>
+                  Medicine camera preview will appear here
+                </div>
+              </div>
+              <div class="controls">
+                <button class="btn primary" id="startMedicalCameraBtn">Start Camera</button>
+                <button class="btn accent"  id="scanMedicineBtn">Scan Medicine</button>
               </div>
             </div>
 
-            <div class="controls">
-              <button class="btn primary" id="startMedicalCameraBtn">Start Camera</button>
-              <button class="btn accent" id="scanMedicineBtn">Scan Medicine</button>
+            <div class="panel">
+              <div class="panel-title">
+                <h3>Medicine Explanation</h3>
+                <span>AI medicine analysis result</span>
+              </div>
+
+              <div class="response-box large">
+                <h3>Detected medicine</h3>
+                <p id="medicalResponse">No medicine scanned yet.</p>
+              </div>
+
+              <div class="controls">
+                <button class="btn secondary" id="repeatMedicalBtn">Repeat</button>
+                <button class="btn secondary" id="stopVoiceMedicalBtn">Stop Voice</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- DRUG INTERACTION -->
+        <section class="page" id="drug">
+          <div class="page-header">
+            <div>
+              <span class="tag">Current tab</span>
+              <h2>Drug Interaction</h2>
+              <p>Track medicines and check whether a newly scanned medicine may be unsafe to combine.</p>
+            </div>
+            <div class="status-card success" id="drugStatus">All clear</div>
+          </div>
+
+          <div class="interaction-ok">
+            <div class="checkmark">✓</div>
+            <div>
+              <h3 id="interactionTitle">Everything is currently OK</h3>
+              <p id="interactionSubtitle">No dangerous combination has been detected yet.</p>
             </div>
           </div>
 
-          <div class="panel">
-            <div class="panel-title">
-              <h3>Medicine Explanation</h3>
-              <span>Prototype medical assistant result</span>
-            </div>
+          <div class="grid two">
+            <div class="panel">
+              <div class="panel-title">
+                <h3>Add Medicine</h3>
+                <span>Manual entry or scanned result</span>
+              </div>
 
-            <div class="response-box large">
-              <h3>Detected medicine</h3>
-              <p id="medicalResponse">No medicine scanned yet.</p>
-            </div>
+              <div class="form">
+                <input type="text" id="drugNameInput" placeholder="Medicine name, e.g. Aspirin" />
+                <input type="text" id="drugDoseInput" placeholder="Dose, e.g. 100mg" />
+                <button class="btn primary" id="addDrugBtn">Add Medicine</button>
+                <button class="btn accent"  id="mockScanDrugBtn">Mock Scan New Medicine</button>
+              </div>
 
-            <div class="controls">
-              <button class="btn secondary" id="repeatMedicalBtn">Repeat</button>
-              <button class="btn secondary" id="stopVoiceMedicalBtn">Stop Voice</button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- DRUG INTERACTION -->
-      <section class="page" id="drug">
-        <div class="page-header">
-          <div>
-            <span class="tag">Current tab</span>
-            <h2>Drug Interaction</h2>
-            <p>Track medicines and check whether a newly scanned medicine may be unsafe to combine.</p>
-          </div>
-          <div class="status-card success" id="drugStatus">All clear</div>
-        </div>
-
-        <div class="interaction-ok">
-          <div class="checkmark">✓</div>
-          <div>
-            <h3>Everything is currently OK</h3>
-            <p>No dangerous combination has been detected yet.</p>
-          </div>
-        </div>
-
-        <div class="grid two">
-          <div class="panel">
-            <div class="panel-title">
-              <h3>Add Medicine</h3>
-              <span>Manual entry or scanned result</span>
-            </div>
-
-            <div class="form">
-              <input type="text" id="drugNameInput" placeholder="Medicine name, e.g. Aspirin" />
-              <input type="text" id="drugDoseInput" placeholder="Dose, e.g. 100mg" />
-              <button class="btn primary" id="addDrugBtn">Add Medicine</button>
-              <button class="btn accent" id="mockScanDrugBtn">Mock Scan New Medicine</button>
-            </div>
-
-            <div class="response-box">
-              <h3>Interaction result</h3>
-              <p id="interactionResponse">No interaction checked yet.</p>
-            </div>
-          </div>
-
-          <div class="panel">
-            <div class="panel-title">
-              <h3>Current Medicine Table</h3>
-              <span>Medicines the user currently uses</span>
-            </div>
-
-            <div class="table-wrapper">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Medicine</th>
-                    <th>Dose</th>
-                    <th>Status</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody id="drugTableBody">
-                  <tr>
-                    <td colspan="4" class="empty-row">No medicines added yet.</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- DOCUMENT -->
-      <section class="page" id="document">
-        <div class="page-header">
-          <div>
-            <span class="tag">Current tab</span>
-            <h2>Document Explainer</h2>
-            <p>Upload medical reports or lab results and get a simple explanation.</p>
-          </div>
-          <div class="status-card" id="documentStatus">Ready</div>
-        </div>
-
-        <div class="medical-warning">
-          This feature explains documents in simple language, but it does not replace professional medical interpretation.
-        </div>
-
-        <div class="grid two">
-          <div class="panel">
-            <div class="panel-title">
-              <h3>Document Preview</h3>
-              <span>Medical report or lab result image</span>
-            </div>
-
-            <div class="upload-preview">
-              <img id="documentPreview" alt="Document preview" />
-              <div class="camera-placeholder" id="documentPlaceholder">
-                Uploaded document will appear here
+              <div class="response-box">
+                <h3>Interaction result</h3>
+                <p id="interactionResponse">No interaction checked yet.</p>
               </div>
             </div>
 
-            <div class="controls vertical">
-              <input type="file" id="documentInput" accept="image/*" />
-              <button class="btn primary" id="explainDocumentBtn">Explain Document</button>
+            <div class="panel">
+              <div class="panel-title">
+                <h3>Current Medicine Table</h3>
+                <span>Medicines the user currently uses</span>
+              </div>
+
+              <div class="table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Medicine</th>
+                      <th>Dose</th>
+                      <th>Status</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="drugTableBody">
+                    <tr>
+                      <td colspan="4" class="empty-row">No medicines added yet.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- DOCUMENT -->
+        <section class="page" id="document">
+          <div class="page-header">
+            <div>
+              <span class="tag">Current tab</span>
+              <h2>Document Explainer</h2>
+              <p>Scan or upload medical reports and lab results and get a simple explanation.</p>
+            </div>
+            <div class="status-card" id="documentStatus">Ready</div>
+          </div>
+
+          <div class="medical-warning">
+            This feature explains documents in simple language, but it does not replace professional medical interpretation.
+          </div>
+
+          <div class="grid two">
+            <!-- Camera scan option -->
+            <div class="panel camera-panel">
+              <div class="panel-title">
+                <h3>Scan Document</h3>
+                <span>Use camera to photograph a document</span>
+              </div>
+              <div class="camera-preview">
+                <video id="documentVideo" autoplay playsinline></video>
+                <canvas id="documentCanvas" hidden></canvas>
+                <div class="camera-placeholder" id="documentCameraPlaceholder">
+                  <div class="placeholder-icon">📄</div>
+                  Point camera at document
+                </div>
+              </div>
+              <div class="controls">
+                <button class="btn primary" id="startDocumentCameraBtn">Start Camera</button>
+                <button class="btn accent"  id="scanDocumentBtn">Scan Document</button>
+              </div>
+            </div>
+
+            <!-- Upload option -->
+            <div class="panel">
+              <div class="panel-title">
+                <h3>Upload Document</h3>
+                <span>Or upload an image file</span>
+              </div>
+
+              <div class="upload-preview">
+                <img id="documentPreview" alt="Document preview" />
+                <div class="camera-placeholder" id="documentPlaceholder">
+                  Uploaded document will appear here
+                </div>
+              </div>
+
+              <div class="controls vertical">
+                <input type="file" id="documentInput" accept="image/*" />
+                <button class="btn primary" id="explainDocumentBtn">Explain Document</button>
+              </div>
             </div>
           </div>
 
-          <div class="panel">
-            <div class="panel-title">
-              <h3>Explanation</h3>
-              <span>Simple medical document summary</span>
-            </div>
-
-            <div class="response-box large">
-              <h3>Document explanation</h3>
-              <p id="documentResponse">No document analyzed yet.</p>
-            </div>
-
-            <div class="controls">
-              <button class="btn secondary" id="repeatDocumentBtn">Repeat</button>
-              <button class="btn secondary" id="stopVoiceDocumentBtn">Stop Voice</button>
-            </div>
+          <!-- Shared result for both scan and upload -->
+          <div class="response-box large" style="margin-top: 24px;">
+            <h3>Document explanation</h3>
+            <p id="documentResponse">No document analyzed yet.</p>
           </div>
-        </div>
-      </section>
-
-      <!-- REMINDER -->
-      <section class="page" id="reminder">
-        <div class="page-header">
-          <div>
-            <span class="tag">Current tab</span>
-            <h2>Medicine Reminder</h2>
-            <p>Add medicines and set reminder times for taking them.</p>
+          <div class="controls" style="margin-top: 12px;">
+            <button class="btn secondary" id="repeatDocumentBtn">Repeat</button>
+            <button class="btn secondary" id="stopVoiceDocumentBtn">Stop Voice</button>
           </div>
-          <div class="status-card" id="reminderStatus">Ready</div>
-        </div>
+        </section>
 
-        <div class="grid two">
-          <div class="panel">
-            <div class="panel-title">
-              <h3>Add Reminder</h3>
-              <span>Medicine alarm setup</span>
+        <!-- REMINDER -->
+        <section class="page" id="reminder">
+          <div class="page-header">
+            <div>
+              <span class="tag">Current tab</span>
+              <h2>Medicine Reminder</h2>
+              <p>Add medicines and set reminder times for taking them.</p>
             </div>
-
-            <div class="form">
-              <input type="text" id="reminderMedicineInput" placeholder="Medicine name" />
-              <input type="time" id="reminderTimeInput" />
-              <button class="btn primary" id="addReminderBtn">Add Reminder</button>
-            </div>
+            <div class="status-card" id="reminderStatus">Ready</div>
           </div>
 
-          <div class="panel">
-            <div class="panel-title">
-              <h3>Scheduled Reminders</h3>
-              <span>Upcoming medicine alarms</span>
+          <div class="grid two">
+            <div class="panel">
+              <div class="panel-title">
+                <h3>Add Reminder</h3>
+                <span>Medicine alarm setup</span>
+              </div>
+
+              <div class="form">
+                <input type="text"  id="reminderMedicineInput" placeholder="Medicine name" />
+                <input type="time"  id="reminderTimeInput" />
+                <button class="btn primary" id="addReminderBtn">Add Reminder</button>
+              </div>
             </div>
 
-            <div class="table-wrapper">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Medicine</th>
-                    <th>Time</th>
-                    <th>Status</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody id="reminderTableBody">
-                  <tr>
-                    <td colspan="4" class="empty-row">No reminders added yet.</td>
-                  </tr>
-                </tbody>
-              </table>
+            <div class="panel">
+              <div class="panel-title">
+                <h3>Scheduled Reminders</h3>
+                <span>Upcoming medicine alarms</span>
+              </div>
+
+              <div class="table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Medicine</th>
+                      <th>Time</th>
+                      <th>Status</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="reminderTableBody">
+                    <tr>
+                      <td colspan="4" class="empty-row">No reminders added yet.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
-    </main>
+        </section>
+
+      </main>
+      <!-- ── END MAIN CONTENT ──────────────────────────────────── -->
+
+      <!-- Mobile-only fixed bottom navigation -->
+      <nav class="bottom-nav">
+        <button class="nav-btn active" data-page="realtime" data-title="Realtime Assistance">
+          <span>📷</span>Live
+        </button>
+        <button class="nav-btn" data-page="capture" data-title="Capture Photo">
+          <span>📸</span>Capture
+        </button>
+        <button class="nav-btn" data-page="upload" data-title="Upload Image">
+          <span>＋</span>Upload
+        </button>
+        <button class="nav-btn" data-page="medical" data-title="Medical Assistant">
+          <span>💊</span>Medical
+        </button>
+        <button class="nav-btn" data-page="drug" data-title="Drug Interaction">
+          <span>✓</span>Drugs
+        </button>
+        <button class="nav-btn" data-page="document" data-title="Document Explainer">
+          <span>📄</span>Docs
+        </button>
+        <button class="nav-btn" data-page="reminder" data-title="Medicine Reminder">
+          <span>⏰</span>Reminder
+        </button>
+      </nav>
+
+    </div>
+    <!-- ── END PAGE AREA ─────────────────────────────────────────── -->
+
   </div>
 
   <script src="app.js"></script>
