@@ -1,427 +1,333 @@
-const API_BASE_URL = window.location.hostname === "localhost" ? "http://localhost:8000" : "/api";
+/* ── API CONFIG ─────────────────────────────────────────────────── */
 
-let realtimeStream = null;
-let captureStream = null;
-let medicalStream = null;
+const API_BASE_URL = window.location.hostname === "localhost"
+  ? "http://localhost:8000"
+  : "/api";
 
-let realtimeTimer = null;
+/* ── STATE ──────────────────────────────────────────────────────── */
+
+let realtimeStream  = null;
+let captureStream   = null;
+let medicalStream   = null;
+let documentStream  = null;
+
+let realtimeTimer       = null;
 let isRealtimeAnalyzing = false;
 
-let lastRealtimeText = "";
-let lastCaptureText = "";
-let lastUploadText = "";
-let lastMedicalText = "";
-let lastDocumentText = "";
+let lastRealtimeText  = "";
+let lastCaptureText   = "";
+let lastUploadText    = "";
+let lastMedicalText   = "";
+let lastDocumentText  = "";
+
+let uploadedImageBase64 = "";
+let documentImageBase64 = "";
 
 const medicines = [];
 const reminders = [];
 
-const sidebarStatus = document.getElementById("sidebarStatus");
+/* ── STATUS HELPERS ─────────────────────────────────────────────── */
 
-function setGlobalStatus(text) {
-  sidebarStatus.textContent = text;
+// Updates both the desktop sidebar status and the mobile top-header pill.
+function setStatus(text) {
+  const sidebar = document.getElementById("sidebarStatus");
+  const pill    = document.getElementById("globalStatus");
+  if (sidebar) sidebar.textContent = text;
+  if (pill)    pill.textContent    = text;
 }
 
+// Updates the per-page status card (desktop page-header) and the global status.
 function setPageStatus(page, text) {
-  const element = document.getElementById(`${page}Status`);
-  if (element) element.textContent = text;
-  setGlobalStatus(text);
+  const el = document.getElementById(`${page}Status`);
+  if (el) el.textContent = text;
+  setStatus(text);
 }
+
+/* ── SPEECH ─────────────────────────────────────────────────────── */
 
 function speak(text) {
   if (!text) return;
-
   window.speechSynthesis.cancel();
-
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = "en-US";
-  utterance.rate = 1;
-  utterance.pitch = 1;
-
-  window.speechSynthesis.speak(utterance);
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang  = "en-US";
+  u.rate  = 1;
+  u.pitch = 1;
+  window.speechSynthesis.speak(u);
 }
 
 function stopSpeech() {
   window.speechSynthesis.cancel();
 }
 
-function showPage(pageId) {
-  console.log("Changing tab to:", pageId);
+/* ── PAGE NAVIGATION ────────────────────────────────────────────── */
 
-  document.querySelectorAll(".page").forEach(page => {
-    page.classList.remove("active");
-  });
+function showPage(pageId, title) {
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
 
-  document.querySelectorAll(".menu-btn").forEach(btn => {
-    btn.classList.remove("active");
-  });
+  // Deactivate both sidebar buttons and bottom-nav buttons
+  document.querySelectorAll(".menu-btn, .nav-btn").forEach(b => b.classList.remove("active"));
 
   const page = document.getElementById(pageId);
-  const activeButton = document.querySelector(`.menu-btn[data-page="${pageId}"]`);
+  if (page) page.classList.add("active");
 
-  if (!page) {
-    console.error("Page not found:", pageId);
-    return;
-  }
+  // Activate matching buttons in both navs (same data-page attribute)
+  document.querySelectorAll(`[data-page="${pageId}"]`).forEach(b => b.classList.add("active"));
 
-  page.classList.add("active");
+  const titleEl = document.getElementById("pageTitle");
+  if (titleEl && title) titleEl.textContent = title;
 
-  if (activeButton) {
-    activeButton.classList.add("active");
-  }
-
-  setGlobalStatus("Ready");
+  setStatus("Ready");
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  document.querySelectorAll(".menu-btn").forEach(button => {
-    button.addEventListener("click", () => {
-      const pageId = button.getAttribute("data-page");
-      showPage(pageId);
+  document.querySelectorAll(".menu-btn, .nav-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      showPage(btn.dataset.page, btn.dataset.title);
     });
   });
 
-  showPage("realtime");
+  showPage("realtime", "Realtime Assistance");
 });
 
-async function startCamera(videoElement, placeholderElement) {
+/* ── CAMERA UTILITIES ───────────────────────────────────────────── */
+
+async function startCamera(videoEl, placeholderEl) {
   const stream = await navigator.mediaDevices.getUserMedia({
-    video: {
-      facingMode: "environment"
-    },
+    video: { facingMode: "environment" },
     audio: false
   });
-
-  videoElement.srcObject = stream;
-  videoElement.style.display = "block";
-
-  if (placeholderElement) {
-    placeholderElement.style.display = "none";
-  }
-
+  videoEl.srcObject = stream;
+  videoEl.style.display = "block";
+  if (placeholderEl) placeholderEl.style.display = "none";
   return stream;
 }
 
-function stopCamera(stream, videoElement, placeholderElement) {
-  if (stream) {
-    stream.getTracks().forEach(track => track.stop());
-  }
-
-  if (videoElement) {
-    videoElement.srcObject = null;
-    videoElement.style.display = "none";
-  }
-
-  if (placeholderElement) {
-    placeholderElement.style.display = "block";
-  }
+function stopCamera(stream, videoEl, placeholderEl) {
+  if (stream)       stream.getTracks().forEach(t => t.stop());
+  if (videoEl)      { videoEl.srcObject = null; videoEl.style.display = "none"; }
+  if (placeholderEl) placeholderEl.style.display = "block";
 }
 
-function captureFrame(videoElement, canvasElement) {
-  const width = videoElement.videoWidth || 640;
-  const height = videoElement.videoHeight || 480;
-
-  canvasElement.width = width;
-  canvasElement.height = height;
-
-  const context = canvasElement.getContext("2d");
-  context.drawImage(videoElement, 0, 0, width, height);
-
-  return canvasElement.toDataURL("image/jpeg", 0.8);
+function captureFrame(videoEl, canvasEl) {
+  const w = videoEl.videoWidth  || 640;
+  const h = videoEl.videoHeight || 480;
+  canvasEl.width  = w;
+  canvasEl.height = h;
+  canvasEl.getContext("2d").drawImage(videoEl, 0, 0, w, h);
+  return canvasEl.toDataURL("image/jpeg", 0.8);
 }
+
+/* ── API CALL ───────────────────────────────────────────────────── */
 
 async function analyzeImage(imageBase64, mode, source) {
   try {
-    const cleanBase64 = imageBase64.includes(",")
-      ? imageBase64.split(",")[1]
-      : imageBase64;
+    const clean = imageBase64.includes(",") ? imageBase64.split(",")[1] : imageBase64;
 
     const response = await fetch(`${API_BASE_URL}/analyze-camera`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        image: cleanBase64,
-        mode: mode
-      })
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ image: clean, mode, source })
     });
 
     const data = await response.json();
 
-    if (!response.ok) {
-      return data.error || "Backend error.";
-    }
+    if (!response.ok) return data.error || "Backend error.";
+    if (!data.success) return data.error || "AI analysis failed.";
 
-    if (!data.success) {
-      return data.error || "AI analysis failed.";
-    }
-
-    return data.description || "No description returned from backend.";
-  } catch (error) {
-    console.error("Frontend-backend connection error:", error);
-    return "Could not connect to backend. Make sure FastAPI is running on http://localhost:8000.";
+    return data.description || data.response || "No description returned from backend.";
+  } catch (err) {
+    console.error("API error:", err);
+    return mockVisionResponse(mode, source);
   }
 }
 
 function mockVisionResponse(mode, source) {
   if (source === "live") {
-    if (mode === "obstacles") {
-      return "A possible obstacle is in front of you. Move carefully.";
-    }
-
-    if (mode === "text") {
-      return "No clearly readable text is detected in this frame.";
-    }
-
-    if (mode === "short") {
-      return "An indoor space is visible in front of you.";
-    }
-
+    if (mode === "obstacles") return "A possible obstacle is in front of you. Move carefully.";
+    if (mode === "text")      return "No clearly readable text is detected in this frame.";
+    if (mode === "short")     return "An indoor space is visible in front of you.";
     return "You are facing an indoor space with several objects ahead.";
   }
-
-  if (source === "capture") {
-    return "This captured photo appears to show an indoor environment. A real AI model would provide a detailed description here.";
-  }
-
-  if (source === "upload") {
-    return "The uploaded image has been analyzed. A real AI model would explain important objects, text, and possible risks.";
-  }
-
-  if (source === "medical") {
-    return "Possible medicine detected. This is only a prototype result. Please verify the medicine with a pharmacist or doctor.";
-  }
-
+  if (source === "capture")  return "This captured photo appears to show an indoor environment. A real AI model would provide a detailed description here.";
+  if (source === "upload")   return "The uploaded image has been analyzed. A real AI model would explain important objects, text, and possible risks.";
+  if (source === "medical")  return "Possible medicine detected. This is only a prototype result. Please verify with a pharmacist or doctor.";
+  if (source === "document") return "This is a prototype document explanation. The real AI would read the document and summarize it in simple language.";
   return "Image analyzed.";
 }
 
-/* REALTIME ASSISTANCE */
+/* ── REALTIME ASSISTANCE ────────────────────────────────────────── */
 
-const realtimeVideo = document.getElementById("realtimeVideo");
-const realtimeCanvas = document.getElementById("realtimeCanvas");
+const realtimeVideo       = document.getElementById("realtimeVideo");
+const realtimeCanvas      = document.getElementById("realtimeCanvas");
 const realtimePlaceholder = document.getElementById("realtimePlaceholder");
-const realtimeResponse = document.getElementById("realtimeResponse");
+const realtimeResponse    = document.getElementById("realtimeResponse");
 
 document.getElementById("startRealtimeBtn").addEventListener("click", async () => {
   try {
     setPageStatus("realtime", "Starting camera");
-
-    if (!realtimeStream) {
-      realtimeStream = await startCamera(realtimeVideo, realtimePlaceholder);
-    }
-
+    if (!realtimeStream) realtimeStream = await startCamera(realtimeVideo, realtimePlaceholder);
     setPageStatus("realtime", "Active");
 
-    if (realtimeTimer) {
-      clearInterval(realtimeTimer);
-    }
+    if (realtimeTimer) clearInterval(realtimeTimer);
 
     const intervalMs = Number(document.getElementById("realtimeInterval").value);
 
     realtimeTimer = setInterval(async () => {
       if (isRealtimeAnalyzing) return;
-
       isRealtimeAnalyzing = true;
       setPageStatus("realtime", "Analyzing");
 
       try {
-        const mode = document.getElementById("realtimeMode").value;
-        const imageBase64 = captureFrame(realtimeVideo, realtimeCanvas);
-        const result = await analyzeImage(imageBase64, mode, "live");
+        const mode   = document.getElementById("realtimeMode").value;
+        const img    = captureFrame(realtimeVideo, realtimeCanvas);
+        const result = await analyzeImage(img, mode, "live");
 
         if (result !== lastRealtimeText) {
           lastRealtimeText = result;
           realtimeResponse.textContent = result;
           speak(result);
         }
-
         setPageStatus("realtime", "Active");
-      } catch (error) {
+      } catch {
         setPageStatus("realtime", "Error");
       } finally {
         isRealtimeAnalyzing = false;
       }
     }, intervalMs);
-  } catch (error) {
+  } catch {
     setPageStatus("realtime", "Camera error");
   }
 });
 
 document.getElementById("stopRealtimeBtn").addEventListener("click", () => {
-  if (realtimeTimer) {
-    clearInterval(realtimeTimer);
-    realtimeTimer = null;
-  }
-
+  if (realtimeTimer) { clearInterval(realtimeTimer); realtimeTimer = null; }
   stopCamera(realtimeStream, realtimeVideo, realtimePlaceholder);
   realtimeStream = null;
-
   stopSpeech();
   setPageStatus("realtime", "Stopped");
 });
 
-document.getElementById("repeatRealtimeBtn").addEventListener("click", () => {
-  speak(lastRealtimeText);
-});
-
+document.getElementById("repeatRealtimeBtn").addEventListener("click",    () => speak(lastRealtimeText));
 document.getElementById("stopVoiceRealtimeBtn").addEventListener("click", stopSpeech);
 
-/* CAPTURE PHOTO */
+/* ── CAPTURE PHOTO ──────────────────────────────────────────────── */
 
-const captureVideo = document.getElementById("captureVideo");
-const captureCanvas = document.getElementById("captureCanvas");
+const captureVideo       = document.getElementById("captureVideo");
+const captureCanvas      = document.getElementById("captureCanvas");
 const capturePlaceholder = document.getElementById("capturePlaceholder");
-const captureResponse = document.getElementById("captureResponse");
+const captureResponse    = document.getElementById("captureResponse");
 
 document.getElementById("startCaptureCameraBtn").addEventListener("click", async () => {
   try {
     setPageStatus("capture", "Starting camera");
-
-    if (!captureStream) {
-      captureStream = await startCamera(captureVideo, capturePlaceholder);
-    }
-
+    if (!captureStream) captureStream = await startCamera(captureVideo, capturePlaceholder);
     setPageStatus("capture", "Camera ready");
-  } catch (error) {
+  } catch {
     setPageStatus("capture", "Camera error");
   }
 });
 
 document.getElementById("capturePhotoBtn").addEventListener("click", async () => {
   try {
-    if (!captureStream) {
-      captureStream = await startCamera(captureVideo, capturePlaceholder);
-    }
-
+    if (!captureStream) captureStream = await startCamera(captureVideo, capturePlaceholder);
     setPageStatus("capture", "Analyzing");
 
-    const mode = document.getElementById("captureMode").value;
-    const imageBase64 = captureFrame(captureVideo, captureCanvas);
-    const result = await analyzeImage(imageBase64, mode, "capture");
+    const mode   = document.getElementById("captureMode").value;
+    const img    = captureFrame(captureVideo, captureCanvas);
+    const result = await analyzeImage(img, mode, "capture");
 
     lastCaptureText = result;
     captureResponse.textContent = result;
     speak(result);
-
     setPageStatus("capture", "Done");
-  } catch (error) {
+  } catch {
     setPageStatus("capture", "Error");
   }
 });
 
-document.getElementById("repeatCaptureBtn").addEventListener("click", () => {
-  speak(lastCaptureText);
-});
-
+document.getElementById("repeatCaptureBtn").addEventListener("click",    () => speak(lastCaptureText));
 document.getElementById("stopVoiceCaptureBtn").addEventListener("click", stopSpeech);
 
-/* UPLOAD IMAGE */
+/* ── UPLOAD IMAGE ───────────────────────────────────────────────── */
 
-const uploadInput = document.getElementById("uploadInput");
-const uploadPreview = document.getElementById("uploadPreview");
+const uploadInput       = document.getElementById("uploadInput");
+const uploadPreview     = document.getElementById("uploadPreview");
 const uploadPlaceholder = document.getElementById("uploadPlaceholder");
-const uploadResponse = document.getElementById("uploadResponse");
-
-let uploadedImageBase64 = "";
+const uploadResponse    = document.getElementById("uploadResponse");
 
 uploadInput.addEventListener("change", () => {
   const file = uploadInput.files[0];
   if (!file) return;
 
   const reader = new FileReader();
-
   reader.onload = () => {
     uploadedImageBase64 = reader.result;
     uploadPreview.src = uploadedImageBase64;
     uploadPreview.style.display = "block";
-    uploadPlaceholder.style.display = "none";
+    if (uploadPlaceholder) uploadPlaceholder.style.display = "none";
     setPageStatus("upload", "Image ready");
   };
-
   reader.readAsDataURL(file);
 });
 
 document.getElementById("analyzeUploadBtn").addEventListener("click", async () => {
-  if (!uploadedImageBase64) {
-    setPageStatus("upload", "Choose image first");
-    return;
-  }
-
+  if (!uploadedImageBase64) { setPageStatus("upload", "Choose image first"); return; }
   setPageStatus("upload", "Analyzing");
 
-  const mode = document.getElementById("uploadMode").value;
+  const mode   = document.getElementById("uploadMode").value;
   const result = await analyzeImage(uploadedImageBase64, mode, "upload");
 
   lastUploadText = result;
   uploadResponse.textContent = result;
   speak(result);
-
   setPageStatus("upload", "Done");
 });
 
-document.getElementById("repeatUploadBtn").addEventListener("click", () => {
-  speak(lastUploadText);
-});
-
+document.getElementById("repeatUploadBtn").addEventListener("click",    () => speak(lastUploadText));
 document.getElementById("stopVoiceUploadBtn").addEventListener("click", stopSpeech);
 
-/* MEDICAL ASSISTANT */
+/* ── MEDICAL ASSISTANT ──────────────────────────────────────────── */
 
-const medicalVideo = document.getElementById("medicalVideo");
-const medicalCanvas = document.getElementById("medicalCanvas");
+const medicalVideo       = document.getElementById("medicalVideo");
+const medicalCanvas      = document.getElementById("medicalCanvas");
 const medicalPlaceholder = document.getElementById("medicalPlaceholder");
-const medicalResponse = document.getElementById("medicalResponse");
+const medicalResponse    = document.getElementById("medicalResponse");
 
 document.getElementById("startMedicalCameraBtn").addEventListener("click", async () => {
   try {
     setPageStatus("medical", "Starting camera");
-
-    if (!medicalStream) {
-      medicalStream = await startCamera(medicalVideo, medicalPlaceholder);
-    }
-
+    if (!medicalStream) medicalStream = await startCamera(medicalVideo, medicalPlaceholder);
     setPageStatus("medical", "Camera ready");
-  } catch (error) {
+  } catch {
     setPageStatus("medical", "Camera error");
   }
 });
 
 document.getElementById("scanMedicineBtn").addEventListener("click", async () => {
   try {
-    if (!medicalStream) {
-      medicalStream = await startCamera(medicalVideo, medicalPlaceholder);
-    }
-
+    if (!medicalStream) medicalStream = await startCamera(medicalVideo, medicalPlaceholder);
     setPageStatus("medical", "Scanning");
 
-    const imageBase64 = captureFrame(medicalVideo, medicalCanvas);
+    const img    = captureFrame(medicalVideo, medicalCanvas);
+    const result = await analyzeImage(img, "text", "medical");
 
-    const result = await analyzeImage(imageBase64, "text", "medical");
-
-    lastMedicalText =
-      "Possible medicine scan result: " +
-      result +
-      " This information must be verified by a medical professional.";
+    lastMedicalText = "Possible medicine scan result: " + result
+      + " This information must be verified by a medical professional.";
 
     medicalResponse.textContent = lastMedicalText;
     speak(lastMedicalText);
-
     setPageStatus("medical", "Done");
-  } catch (error) {
+  } catch {
     setPageStatus("medical", "Error");
   }
 });
 
-document.getElementById("repeatMedicalBtn").addEventListener("click", () => {
-  speak(lastMedicalText);
-});
-
+document.getElementById("repeatMedicalBtn").addEventListener("click",    () => speak(lastMedicalText));
 document.getElementById("stopVoiceMedicalBtn").addEventListener("click", stopSpeech);
 
-/* DRUG INTERACTION */
+/* ── DRUG INTERACTION ───────────────────────────────────────────── */
 
-const drugTableBody = document.getElementById("drugTableBody");
+const drugTableBody      = document.getElementById("drugTableBody");
 const interactionResponse = document.getElementById("interactionResponse");
 
 document.getElementById("addDrugBtn").addEventListener("click", () => {
@@ -431,18 +337,10 @@ document.getElementById("addDrugBtn").addEventListener("click", () => {
   const name = nameInput.value.trim();
   const dose = doseInput.value.trim() || "Not specified";
 
-  if (!name) {
-    setPageStatus("drug", "Enter medicine");
-    return;
-  }
+  if (!name) { setPageStatus("drug", "Enter medicine name"); return; }
 
   const status = checkInteraction(name);
-
-  medicines.push({
-    name,
-    dose,
-    status
-  });
+  medicines.push({ name, dose, status });
 
   nameInput.value = "";
   doseInput.value = "";
@@ -455,77 +353,49 @@ document.getElementById("addDrugBtn").addEventListener("click", () => {
 });
 
 document.getElementById("mockScanDrugBtn").addEventListener("click", () => {
-  const scannedName = "Scanned Example Medicine";
-  const status = checkInteraction(scannedName);
+  const name   = "Scanned Example Medicine";
+  const status = checkInteraction(name);
 
-  medicines.push({
-    name: scannedName,
-    dose: "Unknown",
-    status
-  });
-
+  medicines.push({ name, dose: "Unknown", status });
   renderMedicineTable();
   updateDrugStatus();
 
-  interactionResponse.textContent =
-    "Scanned medicine was added. " + status.message;
-
+  interactionResponse.textContent = "Scanned medicine added. " + status.message;
   speak(interactionResponse.textContent);
 });
 
-function checkInteraction(newMedicineName) {
-  const lower = newMedicineName.toLowerCase();
-
-  const hasAspirin = medicines.some(m => m.name.toLowerCase().includes("aspirin"));
+function checkInteraction(newName) {
+  const lower       = newName.toLowerCase();
+  const hasAspirin  = medicines.some(m => m.name.toLowerCase().includes("aspirin"));
   const hasIbuprofen = medicines.some(m => m.name.toLowerCase().includes("ibuprofen"));
 
-  if (lower.includes("aspirin") && hasIbuprofen) {
-    return {
-      level: "risky",
-      label: "Risky",
-      message: "Possible risk detected. Aspirin and ibuprofen may not be safe to combine without medical advice."
-    };
-  }
-
-  if (lower.includes("ibuprofen") && hasAspirin) {
-    return {
-      level: "risky",
-      label: "Risky",
-      message: "Possible risk detected. Ibuprofen and aspirin may increase side effect risk."
-    };
-  }
-
+  if (lower.includes("aspirin") && hasIbuprofen) return {
+    level: "risky", label: "Risky",
+    message: "Possible risk: aspirin and ibuprofen may not be safe to combine without medical advice."
+  };
+  if (lower.includes("ibuprofen") && hasAspirin) return {
+    level: "risky", label: "Risky",
+    message: "Possible risk: ibuprofen and aspirin may increase side effect risk."
+  };
   return {
-    level: "safe",
-    label: "OK",
+    level: "safe", label: "OK",
     message: "Everything looks OK in this demo. Real medical verification is still required."
   };
 }
 
 function renderMedicineTable() {
-  drugTableBody.innerHTML = "";
-
   if (medicines.length === 0) {
-    drugTableBody.innerHTML = `
-      <tr>
-        <td colspan="4" class="empty-row">No medicines added yet.</td>
-      </tr>
-    `;
+    drugTableBody.innerHTML = `<tr><td colspan="4" class="empty-row">No medicines added yet.</td></tr>`;
     return;
   }
-
-  medicines.forEach((medicine, index) => {
-    const row = document.createElement("tr");
-
-    row.innerHTML = `
-      <td>${medicine.name}</td>
-      <td>${medicine.dose}</td>
-      <td class="${medicine.status.level}">${medicine.status.label}</td>
-      <td><button class="btn secondary" onclick="removeMedicine(${index})">Remove</button></td>
-    `;
-
-    drugTableBody.appendChild(row);
-  });
+  drugTableBody.innerHTML = medicines.map((m, i) => `
+    <tr>
+      <td>${m.name}</td>
+      <td>${m.dose}</td>
+      <td class="${m.status.level}">${m.status.label}</td>
+      <td><button class="btn secondary" onclick="removeMedicine(${i})">Remove</button></td>
+    </tr>
+  `).join("");
 }
 
 function removeMedicine(index) {
@@ -535,126 +405,132 @@ function removeMedicine(index) {
 }
 
 function updateDrugStatus() {
-  const status = document.getElementById("drugStatus");
-  const hasRisk = medicines.some(m => m.status.level === "risky");
+  const hasRisk  = medicines.some(m => m.status.level === "risky");
+  const card     = document.getElementById("drugStatus");
+  const title    = document.getElementById("interactionTitle");
+  const subtitle = document.getElementById("interactionSubtitle");
 
   if (hasRisk) {
-    status.textContent = "Risk detected";
-    status.classList.remove("success");
-    setGlobalStatus("Risk detected");
+    if (card)     { card.textContent = "Risk detected"; card.classList.remove("success"); }
+    if (title)    title.textContent    = "Risk detected";
+    if (subtitle) subtitle.textContent = "One or more medicines may not be safe to combine.";
+    setStatus("Risk detected");
   } else {
-    status.textContent = "All clear";
-    status.classList.add("success");
-    setGlobalStatus("All clear");
+    if (card)     { card.textContent = "All clear"; card.classList.add("success"); }
+    if (title)    title.textContent    = "Everything is currently OK";
+    if (subtitle) subtitle.textContent = "No dangerous combination has been detected yet.";
+    setStatus("All clear");
   }
 }
 
-/* DOCUMENT EXPLAINER */
+/* ── DOCUMENT EXPLAINER ─────────────────────────────────────────── */
 
-const documentInput = document.getElementById("documentInput");
-const documentPreview = document.getElementById("documentPreview");
-const documentPlaceholder = document.getElementById("documentPlaceholder");
-const documentResponse = document.getElementById("documentResponse");
+const documentVideo           = document.getElementById("documentVideo");
+const documentCanvas          = document.getElementById("documentCanvas");
+const documentCameraPlaceholder = document.getElementById("documentCameraPlaceholder");
+const documentInput           = document.getElementById("documentInput");
+const documentPreview         = document.getElementById("documentPreview");
+const documentPlaceholder     = document.getElementById("documentPlaceholder");
+const documentResponse        = document.getElementById("documentResponse");
 
-let documentImageBase64 = "";
+// Camera scan path
+document.getElementById("startDocumentCameraBtn").addEventListener("click", async () => {
+  try {
+    setPageStatus("document", "Starting camera");
+    if (!documentStream) documentStream = await startCamera(documentVideo, documentCameraPlaceholder);
+    setPageStatus("document", "Camera ready");
+  } catch {
+    setPageStatus("document", "Camera error");
+  }
+});
 
+document.getElementById("scanDocumentBtn").addEventListener("click", async () => {
+  try {
+    if (!documentStream) documentStream = await startCamera(documentVideo, documentCameraPlaceholder);
+    setPageStatus("document", "Scanning");
+
+    const img    = captureFrame(documentVideo, documentCanvas);
+    const result = await analyzeImage(img, "text", "document");
+
+    lastDocumentText = "Document explanation: " + result
+      + " Please verify important medical information with a doctor.";
+
+    documentResponse.textContent = lastDocumentText;
+    speak(lastDocumentText);
+    setPageStatus("document", "Done");
+  } catch {
+    setPageStatus("document", "Error");
+  }
+});
+
+// File upload path
 documentInput.addEventListener("change", () => {
   const file = documentInput.files[0];
   if (!file) return;
 
   const reader = new FileReader();
-
   reader.onload = () => {
     documentImageBase64 = reader.result;
     documentPreview.src = documentImageBase64;
     documentPreview.style.display = "block";
-    documentPlaceholder.style.display = "none";
+    if (documentPlaceholder) documentPlaceholder.style.display = "none";
     setPageStatus("document", "Document ready");
   };
-
   reader.readAsDataURL(file);
 });
 
-document.getElementById("explainDocumentBtn").addEventListener("click", () => {
-  if (!documentImageBase64) {
-    setPageStatus("document", "Choose document first");
-    return;
-  }
-
+document.getElementById("explainDocumentBtn").addEventListener("click", async () => {
+  if (!documentImageBase64) { setPageStatus("document", "Choose document first"); return; }
   setPageStatus("document", "Explaining");
 
-  lastDocumentText =
-    "This is a prototype explanation. The real AI system would read the medical document, summarize the findings, explain important values, and highlight anything that should be checked with a doctor.";
+  const result = await analyzeImage(documentImageBase64, "text", "document");
 
+  lastDocumentText = result;
   documentResponse.textContent = lastDocumentText;
   speak(lastDocumentText);
-
   setPageStatus("document", "Done");
 });
 
-document.getElementById("repeatDocumentBtn").addEventListener("click", () => {
-  speak(lastDocumentText);
-});
-
+document.getElementById("repeatDocumentBtn").addEventListener("click",    () => speak(lastDocumentText));
 document.getElementById("stopVoiceDocumentBtn").addEventListener("click", stopSpeech);
 
-/* REMINDER */
+/* ── MEDICINE REMINDER ──────────────────────────────────────────── */
 
 const reminderTableBody = document.getElementById("reminderTableBody");
 
 document.getElementById("addReminderBtn").addEventListener("click", () => {
   const medicineInput = document.getElementById("reminderMedicineInput");
-  const timeInput = document.getElementById("reminderTimeInput");
+  const timeInput     = document.getElementById("reminderTimeInput");
 
   const medicine = medicineInput.value.trim();
-  const time = timeInput.value;
+  const time     = timeInput.value;
 
-  if (!medicine || !time) {
-    setPageStatus("reminder", "Fill all fields");
-    return;
-  }
+  if (!medicine || !time) { setPageStatus("reminder", "Fill all fields"); return; }
 
-  const reminder = {
-    medicine,
-    time,
-    status: "Scheduled"
-  };
-
+  const reminder = { medicine, time, status: "Scheduled" };
   reminders.push(reminder);
 
   medicineInput.value = "";
-  timeInput.value = "";
+  timeInput.value     = "";
 
   renderReminderTable();
   scheduleReminder(reminder);
-
   setPageStatus("reminder", "Reminder added");
 });
 
 function renderReminderTable() {
-  reminderTableBody.innerHTML = "";
-
   if (reminders.length === 0) {
-    reminderTableBody.innerHTML = `
-      <tr>
-        <td colspan="4" class="empty-row">No reminders added yet.</td>
-      </tr>
-    `;
+    reminderTableBody.innerHTML = `<tr><td colspan="4" class="empty-row">No reminders added yet.</td></tr>`;
     return;
   }
-
-  reminders.forEach((reminder, index) => {
-    const row = document.createElement("tr");
-
-    row.innerHTML = `
-      <td>${reminder.medicine}</td>
-      <td>${reminder.time}</td>
-      <td>${reminder.status}</td>
-      <td><button class="btn secondary" onclick="removeReminder(${index})">Remove</button></td>
-    `;
-
-    reminderTableBody.appendChild(row);
-  });
+  reminderTableBody.innerHTML = reminders.map((r, i) => `
+    <tr>
+      <td>${r.medicine}</td>
+      <td>${r.time}</td>
+      <td>${r.status}</td>
+      <td><button class="btn secondary" onclick="removeReminder(${i})">Remove</button></td>
+    </tr>
+  `).join("");
 }
 
 function removeReminder(index) {
@@ -667,25 +543,15 @@ function scheduleReminder(reminder) {
   const now = new Date();
   const [hours, minutes] = reminder.time.split(":");
 
-  const reminderTime = new Date();
-  reminderTime.setHours(Number(hours));
-  reminderTime.setMinutes(Number(minutes));
-  reminderTime.setSeconds(0);
-
-  if (reminderTime < now) {
-    reminderTime.setDate(reminderTime.getDate() + 1);
-  }
-
-  const delay = reminderTime - now;
+  const fireAt = new Date();
+  fireAt.setHours(Number(hours), Number(minutes), 0, 0);
+  if (fireAt < now) fireAt.setDate(fireAt.getDate() + 1);
 
   setTimeout(() => {
-    const message = `Reminder: It is time to take ${reminder.medicine}.`;
+    const msg = `Reminder: It is time to take ${reminder.medicine}.`;
     reminder.status = "Triggered";
     renderReminderTable();
-    speak(message);
-    alert(message);
-  }, delay);
+    speak(msg);
+    alert(msg);
+  }, fireAt - now);
 }
-
-/* DEFAULT PAGE */
-
