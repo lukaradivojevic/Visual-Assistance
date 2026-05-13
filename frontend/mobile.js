@@ -10,7 +10,7 @@
   For phone camera, HTTPS is strongly recommended.
 */
 
-const API_BASE_URL = "http://visual-assistance-load-balancer-1429357949.eu-west-1.elb.amazonaws.com";
+const API_BASE_URL = "http://localhost:8000";
 
 let realtimeStream = null;
 let captureStream = null;
@@ -34,24 +34,49 @@ const reminders = [];
 const globalStatus = document.getElementById("globalStatus");
 const pageTitle = document.getElementById("pageTitle");
 
+
 function setStatus(text) {
   globalStatus.textContent = text;
 }
 
-function speak(text) {
-  if (!text) return;
+let speechQueue = [];
+let isSpeaking = false;
 
-  window.speechSynthesis.cancel();
+function speak(text) {
+  if (!text || text.trim() === "") return;
+
+  speechQueue.push(text);
+  processSpeechQueue();
+}
+
+function processSpeechQueue() {
+  if (isSpeaking || speechQueue.length === 0) return;
+
+  isSpeaking = true;
+
+  const text = speechQueue.shift();
 
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = "en-US";
   utterance.rate = 1;
   utterance.pitch = 1;
 
+  utterance.onend = function () {
+    isSpeaking = false;
+    processSpeechQueue();
+  };
+
+  utterance.onerror = function () {
+    isSpeaking = false;
+    processSpeechQueue();
+  };
+
   window.speechSynthesis.speak(utterance);
 }
 
 function stopSpeech() {
+  speechQueue = [];
+  isSpeaking = false;
   window.speechSynthesis.cancel();
 }
 
@@ -189,7 +214,7 @@ function mockVisionResponse(mode, source) {
       return "No clearly readable text is detected in this frame.";
     }
 
-    if (mode === "short") {
+    if (mode === "people") {
       return "An indoor space is visible in front of you.";
     }
 
@@ -222,6 +247,40 @@ const realtimeCanvas = document.getElementById("realtimeCanvas");
 const realtimePlaceholder = document.getElementById("realtimePlaceholder");
 const realtimeResponse = document.getElementById("realtimeResponse");
 
+async function analyzeRealtimeLoop() {
+  if (!realtimeStream) return;
+
+  isRealtimeAnalyzing = true;
+  setStatus("Analyzing");
+
+  try {
+    const mode = document.getElementById("realtimeMode").value;
+    const imageBase64 = captureFrame(realtimeVideo, realtimeCanvas);
+    const result = await analyzeImage(imageBase64, mode, "live");
+
+    if (result !== lastRealtimeText) {
+      lastRealtimeText = result;
+      realtimeResponse.textContent = result;
+      speak(result);
+    }
+
+    setStatus("Active");
+  } catch (error) {
+    console.error("Realtime analysis error:", error);
+    setStatus("Error");
+  } finally {
+    isRealtimeAnalyzing = false;
+
+    let intervalValue = Number(document.getElementById("realtimeInterval").value);
+
+    // If HTML value is 5 or 8, treat it as seconds.
+    // If value is 5000 or 8000, treat it as milliseconds.
+    const intervalMs = intervalValue < 1000 ? intervalValue * 1000 : intervalValue;
+
+    realtimeTimer = setTimeout(analyzeRealtimeLoop, intervalMs);
+  }
+}
+
 document.getElementById("startRealtimeBtn").addEventListener("click", async () => {
   try {
     setStatus("Starting");
@@ -233,44 +292,20 @@ document.getElementById("startRealtimeBtn").addEventListener("click", async () =
     setStatus("Active");
 
     if (realtimeTimer) {
-      clearInterval(realtimeTimer);
+      clearTimeout(realtimeTimer);
+      realtimeTimer = null;
     }
 
-    const intervalMs = Number(document.getElementById("realtimeInterval").value);
-
-    realtimeTimer = setInterval(async () => {
-      if (isRealtimeAnalyzing) return;
-
-      isRealtimeAnalyzing = true;
-      setStatus("Analyzing");
-
-      try {
-        const mode = document.getElementById("realtimeMode").value;
-        const imageBase64 = captureFrame(realtimeVideo, realtimeCanvas);
-        const result = await analyzeImage(imageBase64, mode, "live");
-
-        if (result !== lastRealtimeText) {
-          lastRealtimeText = result;
-          realtimeResponse.textContent = result;
-          speak(result);
-        }
-
-        setStatus("Active");
+    analyzeRealtimeLoop();
       } catch (error) {
-        setStatus("Error");
-      } finally {
-        isRealtimeAnalyzing = false;
+        console.error(error);
+        setStatus("Camera error");
       }
-    }, intervalMs);
-  } catch (error) {
-    console.error(error);
-    setStatus("Camera error");
-  }
-});
+    });
 
 document.getElementById("stopRealtimeBtn").addEventListener("click", () => {
   if (realtimeTimer) {
-    clearInterval(realtimeTimer);
+    clearTimeout(realtimeTimer);
     realtimeTimer = null;
   }
 

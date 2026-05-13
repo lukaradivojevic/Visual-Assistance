@@ -28,20 +28,44 @@ function setPageStatus(page, text) {
   setGlobalStatus(text);
 }
 
-function speak(text) {
-  if (!text) return;
+let speechQueue = [];
+let isSpeaking = false;
 
-  window.speechSynthesis.cancel();
+function speak(text) {
+  if (!text || text.trim() === "") return;
+
+  speechQueue.push(text);
+  processSpeechQueue();
+}
+
+function processSpeechQueue() {
+  if (isSpeaking || speechQueue.length === 0) return;
+
+  isSpeaking = true;
+
+  const text = speechQueue.shift();
 
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = "en-US";
   utterance.rate = 1;
   utterance.pitch = 1;
 
+  utterance.onend = function () {
+    isSpeaking = false;
+    processSpeechQueue();
+  };
+
+  utterance.onerror = function () {
+    isSpeaking = false;
+    processSpeechQueue();
+  };
+
   window.speechSynthesis.speak(utterance);
 }
 
 function stopSpeech() {
+  speechQueue = [];
+  isSpeaking = false;
   window.speechSynthesis.cancel();
 }
 
@@ -174,7 +198,7 @@ function mockVisionResponse(mode, source) {
       return "No clearly readable text is detected in this frame.";
     }
 
-    if (mode === "short") {
+    if (mode === "people") {
       return "An indoor space is visible in front of you.";
     }
 
@@ -219,30 +243,41 @@ document.getElementById("startRealtimeBtn").addEventListener("click", async () =
 
     const intervalMs = Number(document.getElementById("realtimeInterval").value);
 
-    realtimeTimer = setInterval(async () => {
-      if (isRealtimeAnalyzing) return;
+   async function analyzeRealtimeLoop() {
+    if (!realtimeStream) return;
 
-      isRealtimeAnalyzing = true;
-      setPageStatus("realtime", "Analyzing");
+    isRealtimeAnalyzing = true;
+    setPageStatus("realtime", "Analyzing");
 
-      try {
-        const mode = document.getElementById("realtimeMode").value;
-        const imageBase64 = captureFrame(realtimeVideo, realtimeCanvas);
-        const result = await analyzeImage(imageBase64, mode, "live");
+    try {
+      const mode = document.getElementById("realtimeMode").value;
+      const imageBase64 = captureFrame(realtimeVideo, realtimeCanvas);
+      const result = await analyzeImage(imageBase64, mode, "live");
 
-        if (result !== lastRealtimeText) {
-          lastRealtimeText = result;
-          realtimeResponse.textContent = result;
-          speak(result);
-        }
-
-        setPageStatus("realtime", "Active");
-      } catch (error) {
-        setPageStatus("realtime", "Error");
-      } finally {
-        isRealtimeAnalyzing = false;
+      if (result !== lastRealtimeText) {
+        lastRealtimeText = result;
+        realtimeResponse.textContent = result;
+        speak(result);
       }
-    }, intervalMs);
+
+      setPageStatus("realtime", "Active");
+    } catch (error) {
+      console.error("Realtime analysis error:", error);
+      setPageStatus("realtime", "Error");
+    } finally {
+      isRealtimeAnalyzing = false;
+
+      let intervalValue = Number(document.getElementById("realtimeInterval").value);
+
+      // If the value is written as 5, treat it as 5 seconds.
+      // If it is written as 5000, treat it as milliseconds.
+      const intervalMs = intervalValue < 1000 ? intervalValue * 1000 : intervalValue;
+
+      realtimeTimer = setTimeout(analyzeRealtimeLoop, intervalMs);
+    }
+}
+
+analyzeRealtimeLoop();
   } catch (error) {
     setPageStatus("realtime", "Camera error");
   }
@@ -250,7 +285,7 @@ document.getElementById("startRealtimeBtn").addEventListener("click", async () =
 
 document.getElementById("stopRealtimeBtn").addEventListener("click", () => {
   if (realtimeTimer) {
-    clearInterval(realtimeTimer);
+    clearTimeout(realtimeTimer);
     realtimeTimer = null;
   }
 
