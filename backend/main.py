@@ -19,17 +19,20 @@ class CameraRequest(BaseModel):
     image: str
     mode: str = "general"
 
-@app.get("/") # does backend work
+@app.get("/")
+@app.get("/api/")
 def home():
     return {"message": "Visual Assistance backend is running"}
 
-@app.get("/modes") # returns possible working mode
+@app.get("/modes")
+@app.get("/api/modes")
 def get_modes():
     return {
         "available_modes": VALID_MODES
     }
 
-@app.post("/analyze-camera") # takes picture and mode
+@app.post("/api/analyze-camera")
+@app.post("/analyze-camera")
 def analyze_camera(request: CameraRequest):
     if not request.image:
         error_message = "Image is missing."
