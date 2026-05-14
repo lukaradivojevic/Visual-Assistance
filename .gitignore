@@ -231,3 +231,7 @@ venv/
 # Logs
 logs.jsonl
 *.log
+
+# User memory data - private/local only
+backend/memory_folder/user_memory.json
+backend/memory_folder/memory_images/

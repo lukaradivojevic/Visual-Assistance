@@ -1,9 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-
+from memory_folder.user_memory import add_memory, load_user_memory
 from vision_agent import analyze_image, VALID_MODES
 from logger import log_request
+from typing import Optional
 
 app = FastAPI(title="Visual Assistance Backend")
 
@@ -18,6 +19,11 @@ app.add_middleware(
 class CameraRequest(BaseModel):
     image: str
     mode: str = "general"
+
+class MemoryRequest(BaseModel):
+    text: str
+    category: str = "general"
+    image: Optional[str] = None
 
 @app.get("/") # does backend work
 def home():
@@ -85,4 +91,32 @@ def analyze_camera(request: CameraRequest):
         "success": True,
         "description": description,
         "mode": request.mode
+    }
+
+@app.post("/memory/add")
+def add_user_memory(request: MemoryRequest):
+    if not request.text.strip():
+        return {
+            "success": False,
+            "error": "Memory text cannot be empty."
+        }
+
+    memory = add_memory(
+        text=request.text.strip(),
+        category=request.category,
+        image_base64=request.image
+    )
+
+    return {
+        "success": True,
+        "message": "Memory saved successfully.",
+        "memory": memory
+    }
+
+
+@app.get("/memory")
+def get_memory():
+    return {
+        "success": True,
+        "memory": load_user_memory()
     }
