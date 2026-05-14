@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://localhost:8000";
+const API_BASE_URL = "http://visual-assistance-load-balancer-1429357949.eu-west-1.elb.amazonaws.com";
 
 let realtimeStream = null;
 let captureStream = null;
