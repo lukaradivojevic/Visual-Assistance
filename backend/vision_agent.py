@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Literal
 import json
 from pydantic import ValidationError
+from memory_folder.user_memory import get_user_context
 
 load_dotenv()
 
@@ -229,7 +230,7 @@ SCHEMAS = {
 }
 
 
-def build_sgr_prompt(mode: str, schema_model) -> str:
+def build_sgr_prompt(mode: str, schema_model, user_context: str) -> str:
     schema = schema_model.model_json_schema()
 
     return f"""
@@ -241,6 +242,9 @@ Do not skip the structure.
 
 Mode: {mode}
 
+Personal user context:
+{user_context}
+
 Return only valid JSON matching this schema:
 {json.dumps(schema, indent=2)}
 
@@ -248,6 +252,8 @@ Global rules:
 - Do not mention personal appearance at all.
 - Do not mention hair, beard, glasses, clothing, skin tone, age, gender, or facial features.
 - Focus only on useful information for blind and visually impaired users.
+- Use the personal user context only when it is relevant.
+- Do not invent details based on the personal context.
 - Do not invent details that are not clearly visible.
 - If something is unclear, mark it as unclear.
 - final_response must preferably be one sentence.
@@ -257,13 +263,13 @@ Global rules:
 
 
 def analyze_image(image_base64: str, mode: str = "general") -> str:
-    
 
     if mode not in SCHEMAS:
         raise ValueError(f"Invalid mode: {mode}")
 
     schema_model = SCHEMAS[mode]
-    prompt = build_sgr_prompt(mode, schema_model)
+    user_context = get_user_context(mode)
+    prompt = build_sgr_prompt(mode, schema_model, user_context)
 
     response = client.chat.completions.create(
         model="pixtral-large-latest",

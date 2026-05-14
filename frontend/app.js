@@ -606,3 +606,375 @@ function scheduleReminder(reminder) {
     alert(msg);
   }, fireAt - now);
 }
+
+const voiceCommandBtn = document.getElementById("voiceCommandBtn");
+const voiceCommandText = document.getElementById("voiceCommandText");
+
+const captureVoiceCommandBtn = document.getElementById("captureVoiceCommandBtn");
+const captureVoiceCommandText = document.getElementById("captureVoiceCommandText");
+
+const uploadVoiceCommandBtn = document.getElementById("uploadVoiceCommandBtn");
+const uploadVoiceCommandText = document.getElementById("uploadVoiceCommandText");
+
+let activeVoiceSource = "realtime";
+let activeVoiceTextElement = voiceCommandText;
+
+const SpeechRecognition =
+    window.SpeechRecognition || window.webkitSpeechRecognition;
+
+let recognition = null;
+
+function setVoiceText(text) {
+    if (activeVoiceTextElement) {
+        activeVoiceTextElement.textContent = text;
+    }
+}
+
+function startVoiceCommand(source, textElement) {
+    activeVoiceSource = source;
+    activeVoiceTextElement = textElement;
+
+    if (!SpeechRecognition) {
+        setVoiceText("Speech recognition is not supported in this browser.");
+        return;
+    }
+
+    setVoiceText("Listening...");
+    recognition.start();
+}
+
+if (!SpeechRecognition) {
+    if (voiceCommandText) {
+        voiceCommandText.textContent = "Speech recognition is not supported in this browser.";
+    }
+
+    if (captureVoiceCommandText) {
+        captureVoiceCommandText.textContent = "Speech recognition is not supported in this browser.";
+    }
+
+    if (uploadVoiceCommandText) {
+        uploadVoiceCommandText.textContent = "Speech recognition is not supported in this browser.";
+    }
+} else {
+    recognition = new SpeechRecognition();
+
+    recognition.lang = "en-US";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    if (voiceCommandBtn) {
+        voiceCommandBtn.addEventListener("click", () => {
+            startVoiceCommand("realtime", voiceCommandText);
+        });
+    }
+
+    if (captureVoiceCommandBtn) {
+        captureVoiceCommandBtn.addEventListener("click", () => {
+            startVoiceCommand("capture", captureVoiceCommandText);
+        });
+    }
+
+    if (uploadVoiceCommandBtn) {
+        uploadVoiceCommandBtn.addEventListener("click", () => {
+            startVoiceCommand("upload", uploadVoiceCommandText);
+        });
+    }
+
+    recognition.onresult = (event) => {
+        const command = event.results[0][0].transcript.toLowerCase().trim();
+
+        console.log("Voice command:", command);
+        setVoiceText("You said: " + command);
+
+        handleVoiceCommand(command);
+    };
+
+    recognition.onerror = (event) => {
+        console.error("Speech recognition error:", event.error);
+        setVoiceText("Voice recognition error: " + event.error);
+    };
+
+    recognition.onend = () => {
+        console.log("Voice recognition stopped.");
+    };
+}
+
+function getCurrentMemoryImageBase64() {
+    if (activeVoiceSource === "realtime") {
+        if (!realtimeStream) {
+            setVoiceText("Start realtime camera first.");
+            return null;
+        }
+
+        return captureFrame(realtimeVideo, realtimeCanvas);
+    }
+
+    if (activeVoiceSource === "capture") {
+        if (!captureStream) {
+            setVoiceText("Start capture camera first.");
+            return null;
+        }
+
+        return captureFrame(captureVideo, captureCanvas);
+    }
+
+    if (activeVoiceSource === "upload") {
+        if (!uploadedImageBase64) {
+            setVoiceText("Upload an image first.");
+            return null;
+        }
+
+        return uploadedImageBase64;
+    }
+
+    return null;
+}
+
+function changeModeForActiveSource(mode) {
+    if (activeVoiceSource === "realtime") {
+        const realtimeMode = document.getElementById("realtimeMode");
+        if (realtimeMode) realtimeMode.value = mode;
+    }
+
+    if (activeVoiceSource === "capture") {
+        const captureMode = document.getElementById("captureMode");
+        if (captureMode) captureMode.value = mode;
+    }
+
+    if (activeVoiceSource === "upload") {
+        const uploadMode = document.getElementById("uploadMode");
+        if (uploadMode) uploadMode.value = mode;
+    }
+}
+
+function handleVoiceCommand(command) {
+    command = command.toLowerCase().trim();
+
+    // REMEMBER PLACE
+    if (
+        command.startsWith("remember this place as") ||
+        command.startsWith("remember this place is")
+    ) {
+        let placeName = "";
+
+        if (command.startsWith("remember this place as")) {
+            placeName = command.replace("remember this place as", "").trim();
+        } else {
+            placeName = command.replace("remember this place is", "").trim();
+        }
+
+        if (!placeName) {
+            setVoiceText("Place name is missing.");
+            return;
+        }
+
+        const memoryText = "Known place: " + placeName;
+        const imageBase64 = getCurrentMemoryImageBase64();
+
+        if (!imageBase64) return;
+
+        saveMemoryToBackend(memoryText, "general", imageBase64);
+
+        setVoiceText("Saving place memory: " + placeName);
+        console.log("Place to remember:", placeName);
+    }
+
+    // REMEMBER PERSON
+    else if (
+        command.startsWith("remember this person as") ||
+        command.startsWith("remember this person is")
+    ) {
+        let personName = "";
+
+        if (command.startsWith("remember this person as")) {
+            personName = command.replace("remember this person as", "").trim();
+        } else {
+            personName = command.replace("remember this person is", "").trim();
+        }
+
+        if (!personName) {
+            setVoiceText("Person name is missing.");
+            return;
+        }
+
+        const memoryText = "Known person: " + personName;
+        const imageBase64 = getCurrentMemoryImageBase64();
+
+        if (!imageBase64) return;
+
+        saveMemoryToBackend(memoryText, "people", imageBase64);
+
+        setVoiceText("Saving person memory: " + personName);
+        console.log("Person to remember:", personName);
+    }
+
+    // REMEMBER OBJECT
+    else if (
+        command.startsWith("remember this object as") ||
+        command.startsWith("remember this object is")
+    ) {
+        let objectName = "";
+
+        if (command.startsWith("remember this object as")) {
+            objectName = command.replace("remember this object as", "").trim();
+        } else {
+            objectName = command.replace("remember this object is", "").trim();
+        }
+
+        if (!objectName) {
+            setVoiceText("Object name is missing.");
+            return;
+        }
+
+        const memoryText = "Known object: " + objectName;
+        const imageBase64 = getCurrentMemoryImageBase64();
+
+        if (!imageBase64) return;
+
+        saveMemoryToBackend(memoryText, "general", imageBase64);
+
+        setVoiceText("Saving object memory: " + objectName);
+        console.log("Object to remember:", objectName);
+    }
+
+    // REMEMBER TEXT
+    else if (
+        command.startsWith("remember this text as") ||
+        command.startsWith("remember this text is")
+    ) {
+        let textName = "";
+
+        if (command.startsWith("remember this text as")) {
+            textName = command.replace("remember this text as", "").trim();
+        } else {
+            textName = command.replace("remember this text is", "").trim();
+        }
+
+        if (!textName) {
+            setVoiceText("Text memory is missing.");
+            return;
+        }
+
+        const memoryText = "Known visible text: " + textName;
+        const imageBase64 = getCurrentMemoryImageBase64();
+
+        if (!imageBase64) return;
+
+        saveMemoryToBackend(memoryText, "text", imageBase64);
+
+        setVoiceText("Saving text memory: " + textName);
+        console.log("Text to remember:", textName);
+    }
+
+    // CHANGE MODE TO OBSTACLES
+    else if (
+        command.includes("detect obstacles") ||
+        command.includes("obstacle mode") ||
+        command.includes("find obstacles")
+    ) {
+        changeModeForActiveSource("obstacles");
+
+        setVoiceText("Mode changed to obstacle detection.");
+        console.log("Command: obstacle mode");
+    }
+
+    // CHANGE MODE TO PEOPLE
+    else if (
+        command.includes("find people") ||
+        command.includes("people mode") ||
+        command.includes("detect people")
+    ) {
+        changeModeForActiveSource("people");
+
+        setVoiceText("Mode changed to people description.");
+        console.log("Command: people mode");
+    }
+
+    // CHANGE MODE TO TEXT
+    else if (
+        command.includes("read text") ||
+        command.includes("text mode") ||
+        command.includes("read visible text")
+    ) {
+        changeModeForActiveSource("text");
+
+        setVoiceText("Mode changed to text reading.");
+        console.log("Command: text mode");
+    }
+
+    // CHANGE MODE TO GENERAL
+    else if (
+        command.includes("describe") ||
+        command.includes("general mode") ||
+        command.includes("describe scene")
+    ) {
+        changeModeForActiveSource("general");
+
+        setVoiceText("Mode changed to general description.");
+        console.log("Command: general mode");
+    }
+
+    // UNKNOWN COMMAND
+    else {
+        setVoiceText("Command heard, but not recognized: " + command);
+        console.log("Unknown command:", command);
+    }
+}
+
+async function saveMemoryToBackend(text, category, imageBase64 = null) {
+    try {
+        const response = await fetch("http://127.0.0.1:8000/memory/add", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                text: text,
+                category: category,
+                image: imageBase64
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            setVoiceText("Memory saved: " + text);
+            console.log("Memory saved:", data.memory);
+        } else {
+            setVoiceText("Memory save failed: " + data.error);
+            console.error("Memory save failed:", data);
+        }
+    } catch (error) {
+        setVoiceText("Could not connect to backend memory endpoint.");
+        console.error("Memory backend error:", error);
+    }
+}
+
+async function saveMemoryToBackend(text, category, imageBase64 = null) {
+    try {
+        const response = await fetch("http://127.0.0.1:8000/memory/add", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                text: text,
+                category: category,
+                image: imageBase64
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            voiceCommandText.textContent = "Memory saved: " + text;
+            console.log("Memory saved:", data.memory);
+        } else {
+            voiceCommandText.textContent = "Memory save failed: " + data.error;
+            console.error("Memory save failed:", data);
+        }
+    } catch (error) {
+        voiceCommandText.textContent = "Could not connect to backend memory endpoint.";
+        console.error("Memory backend error:", error);
+    }
+}
