@@ -43,19 +43,44 @@ function setPageStatus(page, text) {
   setStatus(text);
 }
 
-/* ── SPEECH ─────────────────────────────────────────────────────── */
+let speechQueue = [];
+let isSpeaking = false;
 
 function speak(text) {
-  if (!text) return;
-  window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang  = "en-US";
-  u.rate  = 1;
-  u.pitch = 1;
-  window.speechSynthesis.speak(u);
+  if (!text || text.trim() === "") return;
+
+  speechQueue.push(text);
+  processSpeechQueue();
+}
+
+function processSpeechQueue() {
+  if (isSpeaking || speechQueue.length === 0) return;
+
+  isSpeaking = true;
+
+  const text = speechQueue.shift();
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = "en-US";
+  utterance.rate = 1;
+  utterance.pitch = 1;
+
+  utterance.onend = function () {
+    isSpeaking = false;
+    processSpeechQueue();
+  };
+
+  utterance.onerror = function () {
+    isSpeaking = false;
+    processSpeechQueue();
+  };
+
+  window.speechSynthesis.speak(utterance);
 }
 
 function stopSpeech() {
+  speechQueue = [];
+  isSpeaking = false;
   window.speechSynthesis.cancel();
 }
 
@@ -143,9 +168,18 @@ async function analyzeImage(imageBase64, mode, source) {
 
 function mockVisionResponse(mode, source) {
   if (source === "live") {
-    if (mode === "obstacles") return "A possible obstacle is in front of you. Move carefully.";
-    if (mode === "text")      return "No clearly readable text is detected in this frame.";
-    if (mode === "short")     return "An indoor space is visible in front of you.";
+    if (mode === "obstacles") {
+      return "A possible obstacle is in front of you. Move carefully.";
+    }
+
+    if (mode === "text") {
+      return "No clearly readable text is detected in this frame.";
+    }
+
+    if (mode === "people") {
+      return "An indoor space is visible in front of you.";
+    }
+
     return "You are facing an indoor space with several objects ahead.";
   }
   if (source === "capture")  return "This captured photo appears to show an indoor environment. A real AI model would provide a detailed description here.";
@@ -172,35 +206,52 @@ document.getElementById("startRealtimeBtn").addEventListener("click", async () =
 
     const intervalMs = Number(document.getElementById("realtimeInterval").value);
 
-    realtimeTimer = setInterval(async () => {
-      if (isRealtimeAnalyzing) return;
-      isRealtimeAnalyzing = true;
-      setPageStatus("realtime", "Analyzing");
+   async function analyzeRealtimeLoop() {
+    if (!realtimeStream) return;
 
-      try {
-        const mode   = document.getElementById("realtimeMode").value;
-        const img    = captureFrame(realtimeVideo, realtimeCanvas);
-        const result = await analyzeImage(img, mode, "live");
+    isRealtimeAnalyzing = true;
+    setPageStatus("realtime", "Analyzing");
 
-        if (result !== lastRealtimeText) {
-          lastRealtimeText = result;
-          realtimeResponse.textContent = result;
-          speak(result);
-        }
-        setPageStatus("realtime", "Active");
-      } catch {
-        setPageStatus("realtime", "Error");
-      } finally {
-        isRealtimeAnalyzing = false;
+    try {
+      const mode = document.getElementById("realtimeMode").value;
+      const imageBase64 = captureFrame(realtimeVideo, realtimeCanvas);
+      const result = await analyzeImage(imageBase64, mode, "live");
+
+      if (result !== lastRealtimeText) {
+        lastRealtimeText = result;
+        realtimeResponse.textContent = result;
+        speak(result);
       }
-    }, intervalMs);
-  } catch {
+
+      setPageStatus("realtime", "Active");
+    } catch (error) {
+      console.error("Realtime analysis error:", error);
+      setPageStatus("realtime", "Error");
+    } finally {
+      isRealtimeAnalyzing = false;
+
+      let intervalValue = Number(document.getElementById("realtimeInterval").value);
+
+      // If the value is written as 5, treat it as 5 seconds.
+      // If it is written as 5000, treat it as milliseconds.
+      const intervalMs = intervalValue < 1000 ? intervalValue * 1000 : intervalValue;
+
+      realtimeTimer = setTimeout(analyzeRealtimeLoop, intervalMs);
+    }
+}
+
+analyzeRealtimeLoop();
+  } catch (error) {
     setPageStatus("realtime", "Camera error");
   }
 });
 
 document.getElementById("stopRealtimeBtn").addEventListener("click", () => {
-  if (realtimeTimer) { clearInterval(realtimeTimer); realtimeTimer = null; }
+  if (realtimeTimer) {
+    clearTimeout(realtimeTimer);
+    realtimeTimer = null;
+  }
+
   stopCamera(realtimeStream, realtimeVideo, realtimePlaceholder);
   realtimeStream = null;
   stopSpeech();
