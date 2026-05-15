@@ -1,8 +1,9 @@
 /* ── API CONFIG ─────────────────────────────────────────────────── */
 
-const API_BASE_URL = window.location.hostname === "localhost"
-  ? "http://localhost:8000"
-  : "/api";
+const API_BASE_URL =
+  window.location.hostname === "localhost"
+    ? "http://127.0.0.1:8000"
+    : "/api";
 
 /* ── STATE ──────────────────────────────────────────────────────── */
 
@@ -937,6 +938,26 @@ function handleVoiceCommand(command) {
         console.log("Command: general mode");
     }
 
+    // WHO IS THIS PERSON
+    else if (
+        command.includes("who is this") ||
+        command.includes("do i know this person") ||
+        command.includes("is this person familiar") ||
+        command.includes("do you know this person")
+    ) {
+        const imageBase64 = getCurrentMemoryImageBase64();
+
+        if (!imageBase64) {
+            setVoiceText("No image available for person recognition.");
+            return;
+        }
+
+        setVoiceText("Checking if this person is familiar.");
+        checkWhoIsThis(imageBase64);
+
+        console.log("Command: who is this");
+    }
+
     // CHECK IF CURRENT IMAGE IS FAMILIAR
     else if (
         command.includes("is this familiar") ||
@@ -1103,5 +1124,42 @@ async function checkFamiliarMemory(imageBase64) {
         setVoiceText(errorMessage);
 
         speak(description);
+    }
+}
+
+async function checkWhoIsThis(imageBase64) {
+    try {
+        const response = await fetch("http://127.0.0.1:8000/memory/familiar", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                image: imageBase64,
+                category: "people"
+            })
+        });
+
+        const data = await response.json();
+
+        console.log("Who is this result:", data);
+
+        if (!data.success) {
+            const errorMessage = data.error || "Person recognition failed.";
+            setVoiceText(errorMessage);
+            speak(errorMessage);
+            return;
+        }
+
+        const description = data.description || "I do not recognize this person.";
+        setVoiceText(description);
+        speak(description);
+
+    } catch (error) {
+        console.error("Who is this error:", error);
+
+        const errorMessage = "I could not identify this person." + error.message;
+        setVoiceText(errorMessage);
+        speak(errorMessage);
     }
 }

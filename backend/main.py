@@ -27,6 +27,7 @@ class MemoryRequest(BaseModel):
 
 class FamiliarRequest(BaseModel):
     image: str
+    category: Optional[str] = None
 
 @app.get("/")
 @app.get("/api/")
@@ -130,7 +131,10 @@ def check_familiar_memory(request: FamiliarRequest):
         }
 
     try:
-        result = find_familiar_memory(request.image)
+        result = find_familiar_memory(
+            request.image,
+            category_filter=request.category
+        )
 
         log_request(
             mode="familiar",

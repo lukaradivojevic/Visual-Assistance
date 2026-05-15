@@ -131,9 +131,32 @@ def get_user_context(mode: str = "general") -> str:
 
     return "\n".join(context_parts)
 
-def find_familiar_memory(image_base64: str, threshold: float = 0.75) -> dict:
+def clean_memory_name(text: str) -> str:
+    clean_name = text or "this"
+
+    prefixes_to_remove = [
+        "Known object:",
+        "Known place:",
+        "Known person:",
+        "Known visible text:"
+    ]
+
+    for prefix in prefixes_to_remove:
+        if clean_name.lower().startswith(prefix.lower()):
+            clean_name = clean_name[len(prefix):].strip()
+
+    return clean_name
+
+def find_familiar_memory(image_base64: str, threshold: float = 0.75, category_filter: str | None = None
+                         ) -> dict:
     memory = load_user_memory()
     memories = memory.get("memories", [])
+
+    if category_filter:
+        memories = [
+            item for item in memories
+            if item.get("category") == category_filter
+        ]
 
     memories_with_embeddings = [
         item for item in memories
@@ -141,6 +164,13 @@ def find_familiar_memory(image_base64: str, threshold: float = 0.75) -> dict:
     ]
 
     if not memories_with_embeddings:
+        if category_filter == "people":
+            return {
+                "success": True,
+                "familiar": False,
+                "description": "I do not recognize this person."
+            }
+
         return {
             "success": True,
             "familiar": False,
@@ -168,6 +198,14 @@ def find_familiar_memory(image_base64: str, threshold: float = 0.75) -> dict:
             best_memory = item
 
     if best_memory is None or best_score < threshold:
+        if category_filter == "people":
+            return {
+                "success": True,
+                "familiar": False,
+                "similarity": round(best_score, 3),
+                "description": "I do not recognize this person."
+            }
+
         return {
             "success": True,
             "familiar": False,
@@ -181,21 +219,20 @@ def find_familiar_memory(image_base64: str, threshold: float = 0.75) -> dict:
     save_user_memory(memory)
 
     text = best_memory.get("text", "this")
+    clean_name = clean_memory_name(text)
+
+    if category_filter == "people":
+        return {
+            "success": True,
+            "familiar": True,
+            "similarity": round(best_score, 3),
+            "memory": best_memory,
+            "name": clean_name,
+            "description": f"This is {clean_name}."
+        }
+
     category = best_memory.get("category", "general")
     times_seen = best_memory.get("times_seen", 1)
-
-    clean_name = text
-
-    prefixes_to_remove = [
-        "Known object:",
-        "Known place:",
-        "Known person:",
-        "Known visible text:"
-    ]
-
-    for prefix in prefixes_to_remove:
-        if clean_name.lower().startswith(prefix.lower()):
-            clean_name = clean_name[len(prefix):].strip()
 
     category_names = {
         "general": "saved memory",
