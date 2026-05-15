@@ -23,6 +23,8 @@ let lastDocumentText  = "";
 let uploadedImageBase64 = "";
 let documentImageBase64 = "";
 
+let lastSpokenText = "";
+
 const medicines = [];
 const reminders = [];
 
@@ -48,6 +50,8 @@ let isSpeaking = false;
 
 function speak(text) {
   if (!text || text.trim() === "") return;
+
+  lastSpokenText = text;
 
   speechQueue.push(text);
   processSpeechQueue();
@@ -747,6 +751,25 @@ function changeModeForActiveSource(mode) {
     }
 }
 
+function getCurrentModeForActiveSource() {
+    if (activeVoiceSource === "realtime") {
+        const realtimeMode = document.getElementById("realtimeMode");
+        return realtimeMode ? realtimeMode.value : "general";
+    }
+
+    if (activeVoiceSource === "capture") {
+        const captureMode = document.getElementById("captureMode");
+        return captureMode ? captureMode.value : "general";
+    }
+
+    if (activeVoiceSource === "upload") {
+        const uploadMode = document.getElementById("uploadMode");
+        return uploadMode ? uploadMode.value : "general";
+    }
+
+    return "general";
+}
+
 function handleVoiceCommand(command) {
     command = command.toLowerCase().trim();
 
@@ -773,7 +796,7 @@ function handleVoiceCommand(command) {
 
         if (!imageBase64) return;
 
-        saveMemoryToBackend(memoryText, "general", imageBase64);
+        saveMemoryToBackend(memoryText, "place", imageBase64);
 
         setVoiceText("Saving place memory: " + placeName);
         console.log("Place to remember:", placeName);
@@ -831,7 +854,7 @@ function handleVoiceCommand(command) {
 
         if (!imageBase64) return;
 
-        saveMemoryToBackend(memoryText, "general", imageBase64);
+        saveMemoryToBackend(memoryText, "object", imageBase64);
 
         setVoiceText("Saving object memory: " + objectName);
         console.log("Object to remember:", objectName);
@@ -914,6 +937,73 @@ function handleVoiceCommand(command) {
         console.log("Command: general mode");
     }
 
+    // CHECK IF CURRENT IMAGE IS FAMILIAR
+    else if (
+        command.includes("is this familiar") ||
+        command.includes("have i seen this before") ||
+        command.includes("do you recognize this") ||
+        command.includes("recognize this") ||
+        command.includes("is this known")
+    ) {
+        const imageBase64 = getCurrentMemoryImageBase64();
+
+        if (!imageBase64) {
+            setVoiceText("No image available for familiarity check.");
+            return;
+        }
+
+        checkFamiliarMemory(imageBase64);
+
+        setVoiceText("Checking if this looks familiar.");
+        console.log("Command: check familiar memory");
+    }
+
+    // REPEAT LAST RESPONSE
+    else if (
+        command.includes("repeat last") ||
+        command.includes("say that again") ||
+        command.includes("repeat description") ||
+        command.includes("repeat that")
+    ) {
+        if (!lastSpokenText) {
+            setVoiceText("There is nothing to repeat yet.");
+            return;
+        }
+
+        setVoiceText("Repeating last response.");
+        speak(lastSpokenText);
+
+        console.log("Command: repeat last");
+    }
+
+    // CURRENT MODE INFO
+    else if (
+        command.includes("what mode am i in") ||
+        command.includes("current mode") ||
+        command.includes("which mode am i in") ||
+        command.includes("tell me the current mode")
+    ) {
+        const currentMode = getCurrentModeForActiveSource();
+
+        let modeName = "general description";
+
+        if (currentMode === "obstacles") {
+            modeName = "obstacle detection";
+        } else if (currentMode === "people") {
+            modeName = "people description";
+        } else if (currentMode === "text") {
+            modeName = "text reading";
+        } else if (currentMode === "general") {
+            modeName = "general description";
+        }
+
+        const message = "You are currently in " + modeName + " mode.";
+        setVoiceText(message);
+        speak(message);
+
+        console.log("Command: current mode");
+    }
+
     // UNKNOWN COMMAND
     else {
         setVoiceText("Command heard, but not recognized: " + command);
@@ -976,5 +1066,42 @@ async function saveMemoryToBackend(text, category, imageBase64 = null) {
     } catch (error) {
         voiceCommandText.textContent = "Could not connect to backend memory endpoint.";
         console.error("Memory backend error:", error);
+    }
+}
+
+async function checkFamiliarMemory(imageBase64) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/memory/add`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                image: imageBase64
+            })
+        });
+
+        const data = await response.json();
+
+        console.log("Familiar memory result:", data);
+
+        if (!data.success) {
+            const errorMessage = data.error || "Familiar memory check failed.";
+            setVoiceText(errorMessage);
+            return;
+        }
+
+        const description = data.description || "I could not recognize this.";
+        setVoiceText(description);
+
+        speak(description);
+
+    } catch (error) {
+        console.error("Familiar memory error:", error);
+
+        const errorMessage = "I could not check if this is familiar.";
+        setVoiceText(errorMessage);
+
+        speak(description);
     }
 }

@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from memory_folder.user_memory import add_memory, load_user_memory
+from memory_folder.user_memory import add_memory, load_user_memory, find_familiar_memory
 from vision_agent import analyze_image, VALID_MODES
 from logger import log_request
 from typing import Optional
@@ -24,6 +24,9 @@ class MemoryRequest(BaseModel):
     text: str
     category: str = "general"
     image: Optional[str] = None
+
+class FamiliarRequest(BaseModel):
+    image: str
 
 @app.get("/")
 @app.get("/api/")
@@ -116,6 +119,43 @@ def add_user_memory(request: MemoryRequest):
         "memory": memory
     }
 
+@app.post("/memory/familiar")
+def check_familiar_memory(request: FamiliarRequest):
+    if not request.image:
+        return {
+            "success": False,
+            "familiar": False,
+            "description": "",
+            "error": "Image is missing."
+        }
+
+    try:
+        result = find_familiar_memory(request.image)
+
+        log_request(
+            mode="familiar",
+            success=result.get("success", True),
+            description=result.get("description", ""),
+            error=result.get("error")
+        )
+
+        return result
+
+    except Exception as e:
+        error_message = f"Familiar memory check failed: {str(e)}"
+
+        log_request(
+            mode="familiar",
+            success=False,
+            error=error_message
+        )
+
+        return {
+            "success": False,
+            "familiar": False,
+            "description": "",
+            "error": error_message
+        }
 
 @app.get("/memory")
 def get_memory():
