@@ -3,8 +3,12 @@
 const API_BASE_URL = window.location.hostname === "localhost"
   ? "http://localhost:8000"
   : "/api";
+  
 
 /* ── STATE ──────────────────────────────────────────────────────── */
+
+let lastAnalyzedFrameSignature = null;
+let realtimeFrameThreshold = 18;
 
 let realtimeStream  = null;
 let captureStream   = null;
@@ -156,14 +160,45 @@ async function analyzeImage(imageBase64, mode, source) {
 
     const data = await response.json();
 
-    if (!response.ok) return data.error || "Backend error.";
-    if (!data.success) return data.error || "AI analysis failed.";
+    if (!response.ok) {
+      return {
+        text: data.error || "Backend error.",
+        selectedMode: null,
+        routerReason: null
+      };
+    }
 
-    return data.description || data.response || "No description returned from backend.";
+    if (!data.success) {
+      return {
+        text: data.error || "AI analysis failed.",
+        selectedMode: null,
+        routerReason: null
+      };
+    }
+
+    return {
+      text: data.description || data.response || "No description returned from backend.",
+      selectedMode: data.selected_mode || null,
+      routerReason: data.router_reason || null
+    };
+
   } catch (err) {
     console.error("API error:", err);
-    return mockVisionResponse(mode, source);
+
+    return {
+      text: mockVisionResponse(mode, source),
+      selectedMode: null,
+      routerReason: null
+    };
   }
+}
+
+function formatResultForScreen(result) {
+  if (result.selectedMode) {
+    return `[Auto selected: ${result.selectedMode}]\nReason: ${result.routerReason}\n\n${result.text}`;
+  }
+
+  return result.text;
 }
 
 function mockVisionResponse(mode, source) {
@@ -215,12 +250,46 @@ document.getElementById("startRealtimeBtn").addEventListener("click", async () =
     try {
       const mode = document.getElementById("realtimeMode").value;
       const imageBase64 = captureFrame(realtimeVideo, realtimeCanvas);
+
+      const currentSignature = await createFrameSignature(imageBase64);
+      const frameDifference = calculateFrameDifference(
+        lastAnalyzedFrameSignature,
+        currentSignature
+      );
+
+      const shouldAnalyze =
+        lastAnalyzedFrameSignature === null ||
+        frameDifference >= realtimeFrameThreshold;
+
+      if (!shouldAnalyze) {
+        updateRealtimeFrameStatus(
+          `Frame skipped: scene did not change enough. Difference: ${frameDifference.toFixed(1)}`
+        );
+
+        setPageStatus("realtime", "Active");
+        return;
+      }
+
+      updateRealtimeFrameStatus(
+        `Frame analyzed: scene changed. Difference: ${frameDifference.toFixed(1)}`
+      );
+
+      lastAnalyzedFrameSignature = currentSignature;
+
       const result = await analyzeImage(imageBase64, mode, "live");
 
-      if (result !== lastRealtimeText) {
-        lastRealtimeText = result;
-        realtimeResponse.textContent = result;
-        speak(result);
+      updateRouterInfo("live", result);
+
+      if (result.text !== lastRealtimeText) {
+        lastRealtimeText = result.text;
+        realtimeResponse.textContent = result.text;
+
+        const realtimeResponseMobile = document.getElementById("realtimeResponseMobile");
+        if (realtimeResponseMobile) {
+          realtimeResponseMobile.textContent = result.text;
+        }
+
+        speak(result.text);
       }
 
       setPageStatus("realtime", "Active");
@@ -247,6 +316,8 @@ analyzeRealtimeLoop();
 });
 
 document.getElementById("stopRealtimeBtn").addEventListener("click", () => {
+  
+
   if (realtimeTimer) {
     clearTimeout(realtimeTimer);
     realtimeTimer = null;
@@ -255,6 +326,9 @@ document.getElementById("stopRealtimeBtn").addEventListener("click", () => {
   stopCamera(realtimeStream, realtimeVideo, realtimePlaceholder);
   realtimeStream = null;
   stopSpeech();
+
+  lastAnalyzedFrameSignature = null;
+  updateRealtimeFrameStatus("Frame status: waiting.");
   setPageStatus("realtime", "Stopped");
 });
 
@@ -287,9 +361,12 @@ document.getElementById("capturePhotoBtn").addEventListener("click", async () =>
     const img    = captureFrame(captureVideo, captureCanvas);
     const result = await analyzeImage(img, mode, "capture");
 
-    lastCaptureText = result;
-    captureResponse.textContent = result;
-    speak(result);
+    updateRouterInfo("capture", result);
+    
+
+    lastCaptureText = result.text;
+    captureResponse.textContent = result.text;
+    speak(result.text);
     setPageStatus("capture", "Done");
   } catch {
     setPageStatus("capture", "Error");
@@ -328,9 +405,11 @@ document.getElementById("analyzeUploadBtn").addEventListener("click", async () =
   const mode   = document.getElementById("uploadMode").value;
   const result = await analyzeImage(uploadedImageBase64, mode, "upload");
 
-  lastUploadText = result;
-  uploadResponse.textContent = result;
-  speak(result);
+  updateRouterInfo("upload", result);
+
+  lastUploadText = result.text;
+  uploadResponse.textContent = result.text;
+  speak(result.text);
   setPageStatus("upload", "Done");
 });
 
@@ -362,7 +441,7 @@ document.getElementById("scanMedicineBtn").addEventListener("click", async () =>
     const img    = captureFrame(medicalVideo, medicalCanvas);
     const result = await analyzeImage(img, "text", "medical");
 
-    lastMedicalText = "Possible medicine scan result: " + result
+    lastMedicalText = "Possible medicine scan result: " + result.text
       + " This information must be verified by a medical professional.";
 
     medicalResponse.textContent = lastMedicalText;
@@ -503,7 +582,7 @@ document.getElementById("scanDocumentBtn").addEventListener("click", async () =>
     const img    = captureFrame(documentVideo, documentCanvas);
     const result = await analyzeImage(img, "text", "document");
 
-    lastDocumentText = "Document explanation: " + result
+    lastDocumentText = "Document explanation: " + result.text
       + " Please verify important medical information with a doctor.";
 
     documentResponse.textContent = lastDocumentText;
@@ -536,7 +615,7 @@ document.getElementById("explainDocumentBtn").addEventListener("click", async ()
 
   const result = await analyzeImage(documentImageBase64, "text", "document");
 
-  lastDocumentText = result;
+  lastDocumentText = result.text;
   documentResponse.textContent = lastDocumentText;
   speak(lastDocumentText);
   setPageStatus("document", "Done");
@@ -938,35 +1017,6 @@ async function saveMemoryToBackend(text, category, imageBase64 = null) {
         const data = await response.json();
 
         if (data.success) {
-            setVoiceText("Memory saved: " + text);
-            console.log("Memory saved:", data.memory);
-        } else {
-            setVoiceText("Memory save failed: " + data.error);
-            console.error("Memory save failed:", data);
-        }
-    } catch (error) {
-        setVoiceText("Could not connect to backend memory endpoint.");
-        console.error("Memory backend error:", error);
-    }
-}
-
-async function saveMemoryToBackend(text, category, imageBase64 = null) {
-    try {
-        const response = await fetch("http://127.0.0.1:8000/memory/add", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                text: text,
-                category: category,
-                image: imageBase64
-            })
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
             voiceCommandText.textContent = "Memory saved: " + text;
             console.log("Memory saved:", data.memory);
         } else {
@@ -977,4 +1027,88 @@ async function saveMemoryToBackend(text, category, imageBase64 = null) {
         voiceCommandText.textContent = "Could not connect to backend memory endpoint.";
         console.error("Memory backend error:", error);
     }
+}
+
+function updateRouterInfo(source, result) {
+  let el = null;
+
+  if (source === "live") {
+    el = document.getElementById("realtimeRouterInfo");
+
+    const mobileEl = document.getElementById("realtimeRouterInfoMobile");
+    if (mobileEl) {
+      if (result.selectedMode) {
+        mobileEl.textContent = `Auto selected mode: ${result.selectedMode} — ${result.routerReason}`;
+      } else {
+        mobileEl.textContent = "";
+      }
+    }
+  }
+   else if (source === "capture") {
+    el = document.getElementById("captureRouterInfo");
+  } else if (source === "upload") {
+    el = document.getElementById("uploadRouterInfo");
+  }
+
+  if (!el) return;
+
+  if (result.selectedMode) {
+    el.textContent = `Auto selected mode: ${result.selectedMode} — ${result.routerReason}`;
+  } else {
+    el.textContent = "";
+  }
+}
+
+function createFrameSignature(imageBase64) {
+  return new Promise((resolve) => {
+    const img = new Image();
+
+    img.onload = () => {
+      const smallCanvas = document.createElement("canvas");
+      const size = 32;
+
+      smallCanvas.width = size;
+      smallCanvas.height = size;
+
+      const ctx = smallCanvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, size, size);
+
+      const imageData = ctx.getImageData(0, 0, size, size).data;
+      const signature = [];
+
+      for (let i = 0; i < imageData.length; i += 4) {
+        const r = imageData[i];
+        const g = imageData[i + 1];
+        const b = imageData[i + 2];
+
+        const gray = Math.round((r + g + b) / 3);
+        signature.push(gray);
+      }
+
+      resolve(signature);
+    };
+
+    img.onerror = () => {
+      resolve(null);
+    };
+
+    img.src = imageBase64;
+  });
+}
+
+function calculateFrameDifference(firstSignature, secondSignature) {
+  if (!firstSignature || !secondSignature) return 999;
+
+  let totalDifference = 0;
+
+  for (let i = 0; i < firstSignature.length; i++) {
+    totalDifference += Math.abs(firstSignature[i] - secondSignature[i]);
+  }
+
+  return totalDifference / firstSignature.length;
+}
+
+function updateRealtimeFrameStatus(text) {
+  const el = document.getElementById("realtimeFrameStatus");
+  if (el) el.textContent = text;
 }

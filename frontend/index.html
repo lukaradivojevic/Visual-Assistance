@@ -75,6 +75,14 @@
                   Camera preview will appear here
                 </div>
               </div>
+
+              <div class="response-box realtime-mobile-description">
+                <p id="realtimeRouterInfoMobile" class="router-info"></p>
+                <p id="realtimeFrameStatus" class="frame-status">Frame status: waiting.</p>
+                <h3>Last spoken description</h3>
+                <p id="realtimeResponseMobile">No realtime description yet.</p>
+              </div>
+
               <div class="controls">
                 <button class="btn primary" id="startRealtimeBtn">Start Realtime</button>
                 <button class="btn danger"  id="stopRealtimeBtn">Stop</button>
@@ -90,10 +98,11 @@
               <label class="field">
                 Assistance mode
                 <select id="realtimeMode">
+                  <option value="auto">Auto</option>
                   <option value="general">General scene description</option>
+                  <option value="obstacles">Navigation and obstacle detection</option>
                   <option value="people">People description</option>
                   <option value="text">Read visible text</option>
-                  <option value="obstacles">Obstacle detection</option>
                 </select>
               </label>
 
@@ -105,16 +114,14 @@
                   <option value="8000">Every 8 seconds</option>
                 </select>
               </label>
-
+              <p id="realtimeRouterInfo" class="router-info"></p>
+              <p id="realtimeFrameStatus" class="frame-status">Frame status: waiting.</p>
             <div class="response-box">
               <h3>Last spoken description</h3>
               <p id="realtimeResponse">No realtime description yet.</p>
             </div>
 
-              <div class="response-box">
-                <h3>Last spoken description</h3>
-                <p id="realtimeResponse">No realtime description yet.</p>
-              </div>
+          
 
               <div class="controls">
                 <button class="btn secondary" id="repeatRealtimeBtn">Repeat</button>
@@ -126,7 +133,7 @@
               <button class="btn accent" id="voiceCommandBtn">🎤 Voice command</button>
               <p id="voiceCommandText">Voice command will appear here...</p>
             </div>
-          </div>
+          </div>  
           </div>
         </section>
 
@@ -170,13 +177,14 @@
               <label class="field">
                 Description mode
                 <select id="captureMode">
+                  <option value="auto">Auto</option>
                   <option value="general">General</option>
                   <option value="people">People</option>
                   <option value="text">Text reading</option>
                   <option value="obstacles">Obstacles</option>
                 </select>
               </label>
-
+              <p id="captureRouterInfo" class="router-info"></p>
               <div class="response-box large">
                 <h3>Description</h3>
                 <p id="captureResponse">No photo captured yet.</p>
@@ -227,6 +235,7 @@
               <label class="field">
                 Analysis mode
                 <select id="uploadMode">
+                  <option value="auto">Auto</option>
                   <option value="general">General</option>
                   <option value="people">People</option>
                   <option value="text">Text reading</option>
@@ -244,7 +253,7 @@
                 <h3>Upload Result</h3>
                 <span>AI image interpretation</span>
               </div>
-
+              <p id="uploadRouterInfo" class="router-info"></p>
               <div class="response-box large">
                 <h3>Interpretation</h3>
                 <p id="uploadResponse">No image uploaded yet.</p>

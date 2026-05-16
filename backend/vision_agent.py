@@ -262,6 +262,7 @@ Global rules:
 """
 
 
+
 def analyze_image(image_base64: str, mode: str = "general") -> str:
 
     if mode not in SCHEMAS:
@@ -272,33 +273,33 @@ def analyze_image(image_base64: str, mode: str = "general") -> str:
     prompt = build_sgr_prompt(mode, schema_model, user_context)
 
     response = client.chat.completions.create(
-        model="pixtral-large-latest",
-        messages=[
-            {
-                "role": "system",
-                "content": SYSTEM_PROMPT
-            },
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": prompt
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{image_base64}"
-                        }
+    model="pixtral-large-latest",
+    messages=[
+        {
+            "role": "system",
+            "content": SYSTEM_PROMPT
+        },
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": prompt
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{image_base64}"
                     }
-                ]
-            }
-        ],
-        temperature=0.1,
-        top_p=0.9,
-        max_tokens=700,
-        response_format={"type": "json_object"}
-    )
+                }
+            ]
+        }
+    ],
+    temperature=0.1,
+    top_p=0.9,
+    max_tokens=700,
+    response_format={"type": "json_object"}
+)
 
     raw_output = response.choices[0].message.content
 

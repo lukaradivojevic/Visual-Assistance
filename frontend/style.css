@@ -798,3 +798,58 @@ td {
     margin-top: 0;
   }
 }
+
+.router-info {
+  margin: 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2a68;
+}
+
+.realtime-mobile-description {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .realtime-mobile-description {
+    display: block;
+    margin-top: 18px;
+    margin-bottom: 18px;
+  }
+
+  .realtime-mobile-description h3 {
+    font-size: 18px;
+  }
+
+  .realtime-mobile-description p {
+    font-size: 16px;
+    line-height: 1.5;
+  }
+
+  /* sakriva desktop opis samo na telefonu */
+  #realtime .panel:nth-child(2) .response-box:first-of-type {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  #realtime .response-box:has(#voiceCommandText) {
+    margin-top: 22px;
+  }
+}
+
+.frame-status {
+  margin-top: 8px;
+  margin-bottom: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #345;
+}
+
+@media (max-width: 768px) {
+  .frame-status {
+    font-size: 15px;
+    margin-top: 10px;
+    margin-bottom: 12px;
+  }
+}
